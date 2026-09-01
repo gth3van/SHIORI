@@ -1,0 +1,6 @@
+# pyrefly.toml
+# Tells the Pyrefly type-checker which Python interpreter to use.
+# All project dependencies (faster-whisper, sounddevice, numpy, etc.)
+# are installed in this Python 3.11 environment.
+
+python_interpreter = "C:\\Users\\LENOVO\\AppData\\Local\\Programs\\Python\\Python311\\python.exe"

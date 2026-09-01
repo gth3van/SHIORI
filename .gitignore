@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Hugging Face / Whisper model cache
+.cache/
+*.bin
+*.pt
+*.safetensors
+
+# Edge-TTS / audio temp files
+*.mp3
+*.wav
+*.tmp
+
+# Debug artifacts
+debug*.json
+reply.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Pyrefly (local interpreter path — regenerate per machine)
+# pyrefly.toml is intentionally NOT ignored so settings travel with the repo
