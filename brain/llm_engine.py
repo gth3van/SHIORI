@@ -167,21 +167,36 @@ class LLMEngine:
     async def stream_reply(self, user_input: str) -> AsyncIterator[str]:
         """Send *user_input* to Ollama and yield the cleaned reply.
 
-        Awaits the full response (Qwen3 think blocks must be stripped from
-        the complete text, not from a partial stream), then yields the
-        cleaned string as a single chunk.  This is ideal for TTS, which
-        needs the full sentence before it can begin speaking.
+        When ``thinking_mode=False`` (default for SHIORI), the prefix
+        ``/no_think`` is prepended to the message so Qwen3/Qwen3.8 skips
+        chain-of-thought and replies instantly — ideal for real-time voice.
+        When ``thinking_mode=True``, the model reasons first (slower but
+        smarter — useful for complex/JARVIS-style tasks in the future).
+
+        The stored history always uses the original clean input so the
+        conversation context stays natural.
 
         Yields
         ------
         str
             Complete cleaned response (one yield per call).
         """
+        # Save original to history — not the prefixed version
         self._history.append({"role": "user", "content": user_input})
+
+        # Prepend /no_think for instant replies when thinking is off
+        prompt = user_input if self.thinking_mode else f"/no_think {user_input}"
+
+        # Build messages with the (possibly prefixed) prompt as the last user turn
+        messages = (
+            [{"role": "system", "content": self.system_prompt}]
+            + self._history[:-1]
+            + [{"role": "user", "content": prompt}]
+        )
 
         response = await self._client.chat(
             model=self.model,
-            messages=self._build_messages(),
+            messages=messages,
             stream=False,
             options={"temperature": self.temperature},
         )
@@ -219,18 +234,21 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Chat with SHIORI's brain directly in the terminal."
     )
-    parser.add_argument("--model", default="qwen3:4b",
-                        help="Ollama model tag (default: qwen3:4b)")
+    parser.add_argument("--model", default="qwen3:14b",
+                        help="Ollama model tag (default: qwen3:14b)")
     parser.add_argument("--temp", type=float, default=0.8,
                         help="Sampling temperature 0.0-1.0 (default: 0.8)")
     parser.add_argument("--max-history", type=int, default=20,
                         help="Max conversation pairs to keep (default: 20)")
+    parser.add_argument("--think", action="store_true", default=False,
+                        help="Enable Qwen3 thinking mode (slower but smarter, default: off)")
     args = parser.parse_args()
 
     engine = LLMEngine(
         model=args.model,
         temperature=args.temp,
         max_history=args.max_history,
+        thinking_mode=args.think,
     )
 
     async def _main() -> None:

@@ -59,7 +59,7 @@ class STTListener:
 
     def __init__(
         self,
-        model_size: str = "base.en",
+        model_size: str = "base",
         device: str = "cpu",
         compute_type: str = "int8",
         energy_threshold: float = 0.015,

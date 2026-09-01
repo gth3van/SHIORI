@@ -1,4 +1,4 @@
-﻿# SHIORI — Project Roadmap & Build Checklist
+# SHIORI — Project Roadmap & Build Checklist
 
 > This file lives in the repo so both you and the AI always know what's done,
 > what's next, and where the project is heading.
@@ -12,8 +12,8 @@
 - [x] `voice/stt_listener.py` — Microphone capture + faster-whisper transcription
 - [x] `voice/tts_speaker.py` — Edge-TTS synthesis + pygame playback (EN/JA/ID)
 - [x] `brain/llm_engine.py` — Ollama async LLM client + SHIORI persona + Qwen3 think-strip
-- [ ] `brain/llm_engine.py` — Set thinking_mode=False default + wire /no_think prefix
-- [ ] `main.py` — Central asyncio orchestrator (STT → Brain → TTS loop)
+- [x] `brain/llm_engine.py` — thinking_mode=False default + /no_think prefix wired
+- [x] `main.py` — Central asyncio orchestrator (STT → Brain → TTS loop)
 
 **Model:** `qwen3:14b` on RTX 4070 12GB (fully GPU, no CPU offload)
 **Thinking mode:** OFF by default (real-time waifu feel, low latency)
@@ -24,14 +24,14 @@
 > Goal: SHIORI builds a personal knowledge vault about the user over time.
 > Like Obsidian, but in her head.
 
-- [ ] `memory/memory_engine.py` — JSON-based memory vault
-  - [ ] `remember(fact)` — save a timestamped memory
-  - [ ] `recall(query)` — keyword search across saved memories
-  - [ ] `inject_into_prompt(query)` — inject relevant memories into LLM context
-  - [ ] `forget(fact_id)` — delete a specific memory
-- [ ] `memory/shiori_memory.json` — auto-created on first run (her "brain file")
-- [ ] Wire memory into `main.py` (recall before LLM call, save after)
-- [ ] SHIORI auto-extracts facts from conversation ("I hate spicy food" → saved)
+- [x] `memory/memory_engine.py` — JSON-based memory vault
+  - [x] `remember(fact)` — save a timestamped memory
+  - [x] `recall(query)` — keyword search across saved memories
+  - [x] `inject_into_prompt(query)` — inject relevant memories into LLM context
+  - [x] `forget(fact_id)` — delete a specific memory
+- [x] `memory/shiori_memory.json` — auto-created on first run (her "brain file")
+- [x] Wire memory into `main.py` (recall before LLM call, save after)
+- [ ] SHIORI auto-extracts facts from conversation ("I hate spicy food" → saved) ← basic version done, LLM-based extraction in Phase 4
 
 ---
 

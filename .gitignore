@@ -29,6 +29,9 @@ env/
 debug*.json
 reply.txt
 
+# SHIORI personal memory vault (private — do not commit)
+memory/shiori_memory.json
+
 # OS
 .DS_Store
 Thumbs.db

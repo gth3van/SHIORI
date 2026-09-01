@@ -1,0 +1,14 @@
+﻿# SHIORI — Python dependencies
+# Install with: pip install -r requirements.txt
+
+# STT
+faster-whisper
+sounddevice
+numpy
+
+# LLM Brain
+ollama
+
+# TTS
+edge-tts
+pygame

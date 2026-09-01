@@ -33,7 +33,7 @@ VOICE_MAP: dict[str, str] = {
     "id": "id-ID-GadisNeural",     # Indonesian – clear, natural female
 }
 
-_DEFAULT_LANG: str = "en"
+_DEFAULT_LANG: str = "ja"
 
 # Simple regex patterns for quick language detection
 _LANG_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
