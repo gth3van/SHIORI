@@ -6,15 +6,23 @@ SHIORI's dialogue brain — powered by the native Ollama Python client.
 Handles:
   - System prompt / persona management
   - Rolling conversation history (context window control)
-  - Qwen3 think-block stripping (thinking text never reaches TTS)
+  - Qwen3/Qwen3.8 think-block stripping (thinking text never reaches TTS)
+  - Thinking mode toggle (/think vs /no_think prefix)
   - Async, non-blocking design
 
-How Qwen3 thinking works in Ollama:
-  Qwen3 outputs reasoning text directly inside ``message.content`` — it does
-  NOT use the ``message.thinking`` field and does NOT emit an opening
-  ``<think>`` tag.  The block ends with ``</think>``, after which the actual
-  response follows.  ``_strip_think()`` detects this and returns only the
-  response portion.
+Recommended models (pull with ``ollama pull <tag>``):
+  - ``qwen3.8:27b``    — best quality, needs ~20GB RAM  [DEFAULT]
+  - ``qwen3:14b``      — great quality, needs ~10GB RAM
+  - ``qwen3:8b``       — fast, needs ~6GB RAM
+  - ``qwen3:30b-a3b``  — MoE, efficient on lower VRAM
+  - ``qwen3:4b``       — lightest, for low-spec laptops
+
+How Qwen3/Qwen3.8 thinking works in Ollama:
+  The model writes its reasoning directly into ``message.content`` without an
+  opening ``<think>`` tag, closing it with ``</think>``.  The actual reply
+  follows.  ``_strip_think()`` detects this and returns only the response.
+  Thinking can be disabled per-request by prepending ``/no_think`` to the
+  user message (useful for fast conversational replies).
 
 Dependencies:
     pip install ollama
@@ -62,7 +70,12 @@ class LLMEngine:
     Parameters
     ----------
     model:
-        Ollama model tag (e.g. ``"qwen3:4b"``, ``"qwen3:14b"``).
+        Ollama model tag.  Recommended options:
+        - ``"qwen3.8:27b"``   best quality, ~20 GB RAM  ← default
+        - ``"qwen3:14b"``     great quality, ~10 GB RAM
+        - ``"qwen3:8b"``      fast, ~6 GB RAM
+        - ``"qwen3:30b-a3b"`` MoE, efficient on lower VRAM
+        - ``"qwen3:4b"``      lightest, for low-spec laptops
     host:
         Ollama server URL. Default is the standard local endpoint.
     system_prompt:
@@ -72,20 +85,27 @@ class LLMEngine:
         rolling context window. Older messages are dropped automatically.
     temperature:
         Sampling temperature (0.0 = deterministic, 1.0 = creative).
+    thinking_mode:
+        If ``True`` (default), Qwen3/Qwen3.8 chain-of-thought reasoning is
+        enabled — the model thinks before answering (slower but smarter).
+        Set to ``False`` to prepend ``/no_think`` and get instant replies
+        (good for simple greetings / filler responses).
     """
 
     def __init__(
         self,
-        model: str = "qwen3:4b",
+        model: str = "qwen3.8:27b",
         host: str = "http://localhost:11434",
         system_prompt: str = SHIORI_SYSTEM_PROMPT,
         max_history: int = 20,
         temperature: float = 0.8,
+        thinking_mode: bool = True,
     ) -> None:
         self.model = model
         self.system_prompt = system_prompt
         self.max_history = max_history
         self.temperature = temperature
+        self.thinking_mode = thinking_mode
 
         self._client = ollama.AsyncClient(host=host)
         self._history: list[dict[str, str]] = []
