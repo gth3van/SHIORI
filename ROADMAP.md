@@ -60,12 +60,24 @@
 ---
 
 ## ⏳ Phase 5 — Avatar (SHIORI gets a face)
-> Goal: Live2D / VTube Studio avatar that reacts while speaking.
+> Goal: Live2D avatar that reacts and lip-syncs while speaking.
+> Approach: VTube Studio WebSocket API — 100% Python, no C# needed.
+
+**Setup needed:**
+- VTube Studio (free on Steam)
+- A Live2D model file (.vtube.model3.json) — buy on Booth.pm or use a free one
 
 - [ ] `avatar/vtube_client.py` — WebSocket client for VTube Studio API
-- [ ] Lip sync trigger on TTS playback start/stop
-- [ ] Emotion expressions (happy, thinking, surprised) mapped to LLM tone
-- [ ] Idle animation loop when waiting for input
+- [ ] Authenticate with VTube Studio plugin API (token-based)
+- [ ] Lip sync — trigger mouth movement on TTS playback start/stop
+- [ ] Emotion expressions mapped to reply tone (happy, thinking, surprised, idle)
+- [ ] Idle animation loop when waiting for voice input
+- [ ] Hotkey / parameter control for custom expressions
+
+**Architecture:**
+```
+SHIORI (Python) ──WebSocket──▶ VTube Studio ──▶ Live2D Model
+```
 
 ---
 
