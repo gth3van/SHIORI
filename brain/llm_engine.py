@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import asyncio
 import re
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional
 
 import ollama
 
@@ -161,20 +161,68 @@ class LLMEngine:
         return text
 
     # ------------------------------------------------------------------
+    # Tool dispatcher helpers
+    # ------------------------------------------------------------------
+
+    # Keywords that signal the user wants real-world / current information
+    _SEARCH_TRIGGERS_EN: list[str] = [
+        "search", "look up", "find out", "what is", "what are", "who is",
+        "where is", "when is", "how much", "how many", "latest", "recent",
+        "news", "weather", "price", "score", "today", "current", "right now",
+        "tell me about", "do you know", "what happened",
+    ]
+    _SEARCH_TRIGGERS_ID: list[str] = [
+        "cari", "cariin", "cek", "cari tau", "apa itu", "siapa itu",
+        "dimana", "kapan", "berapa", "berita", "cuaca", "harga", "terbaru",
+        "terkini", "sekarang", "hari ini", "tolong cari", "tolong cek",
+        "tau ga", "tau tidak", "gimana kabar",
+    ]
+
+    def _detect_search_intent(self, text: str) -> bool:
+        """Return True if the user's message looks like a web search request."""
+        lower = text.lower()
+        all_triggers = self._SEARCH_TRIGGERS_EN + self._SEARCH_TRIGGERS_ID
+        return any(t in lower for t in all_triggers)
+
+    def _build_search_query(self, text: str) -> str:
+        """Strip conversational filler and return a clean search query."""
+        # Remove common Indonesian/English filler prefixes
+        fillers = [
+            r"^(hey |hei |hai |hi |shiori[,\s]+)",
+            r"^(tolong\s+|please\s+|bisa\s+|boleh\s+)",
+            r"^(cariin|cari|cek|search|look up|find out)\s+(dong|ya|yah|deh|please)?\s*",
+            r"^(tau ga|tau gak|tau tidak|do you know)\s+",
+            r"^(apa itu|what is|what are|who is|siapa itu)\s+",
+            r"^(tell me about|ceritain|jelasin)\s+",
+        ]
+        query = text.strip()
+        for pattern in fillers:
+            query = re.sub(pattern, "", query, flags=re.IGNORECASE).strip()
+        return query or text.strip()
+
+    # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
 
-    async def stream_reply(self, user_input: str) -> AsyncIterator[str]:
+    async def stream_reply(
+        self,
+        user_input: str,
+        tool_context: Optional[str] = None,
+    ) -> AsyncIterator[str]:
         """Send *user_input* to Ollama and yield the cleaned reply.
 
-        When ``thinking_mode=False`` (default for SHIORI), the prefix
-        ``/no_think`` is prepended to the message so Qwen3/Qwen3.8 skips
-        chain-of-thought and replies instantly — ideal for real-time voice.
-        When ``thinking_mode=True``, the model reasons first (slower but
-        smarter — useful for complex/JARVIS-style tasks in the future).
+        Automatically detects when the user wants real-world information,
+        fetches web search results, and injects them into the LLM context.
+        Thinking mode is enabled dynamically for tool tasks and disabled
+        for casual conversation.
 
-        The stored history always uses the original clean input so the
-        conversation context stays natural.
+        Parameters
+        ----------
+        user_input:
+            The raw user message.
+        tool_context:
+            Optional pre-fetched context string (e.g. from web search)
+            to inject. If ``None``, the dispatcher decides automatically.
 
         Yields
         ------
@@ -184,12 +232,39 @@ class LLMEngine:
         # Save original to history — not the prefixed version
         self._history.append({"role": "user", "content": user_input})
 
-        # Prepend /no_think for instant replies when thinking is off
-        prompt = user_input if self.thinking_mode else f"/no_think {user_input}"
+        # --- Tool dispatch: web search -----------------------------------
+        search_context = tool_context  # use pre-fetched if provided
+        is_tool_task = False
 
-        # Build messages with the (possibly prefixed) prompt as the last user turn
+        if search_context is None and self._detect_search_intent(user_input):
+            try:
+                from tools.web_search import search_to_context
+                query = self._build_search_query(user_input)
+                print(f"[LLMEngine] Tool: web search → '{query}'", flush=True)
+                search_context = search_to_context(query)
+                is_tool_task = bool(search_context)
+            except Exception as e:
+                print(f"[LLMEngine] Web search failed: {e}", flush=True)
+
+        # --- Build system prompt (optionally with search context) --------
+        system_content = self.system_prompt
+        if search_context:
+            system_content = (
+                f"{self.system_prompt}\n\n"
+                f"[Current web search context — use this to answer accurately]\n"
+                f"{search_context}"
+            )
+
+        # --- Thinking mode: ON for tool tasks, OFF for casual chat -------
+        use_thinking = self.thinking_mode or is_tool_task
+        prompt = user_input if use_thinking else f"/no_think {user_input}"
+
+        if is_tool_task:
+            print("[LLMEngine] Thinking mode: ON (tool task)", flush=True)
+
+        # --- Build message list ------------------------------------------
         messages = (
-            [{"role": "system", "content": self.system_prompt}]
+            [{"role": "system", "content": system_content}]
             + self._history[:-1]
             + [{"role": "user", "content": prompt}]
         )

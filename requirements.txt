@@ -12,3 +12,8 @@ ollama
 # TTS
 edge-tts
 pygame
+
+# Phase 3 — Tool use
+tavily-python
+python-dotenv
+httpx

@@ -4,16 +4,18 @@ main.py
 SHIORI — Central asyncio orchestrator.
 
 Pipeline (one loop iteration):
-  1. STT listens for speech → transcript (str)
+  1. Input — voice (STT mic) or text (keyboard) depending on --mode
   2. MemoryEngine injects relevant facts into the LLM context
-  3. LLMEngine generates SHIORI reply (thinking OFF for real-time feel)
+  3. LLMEngine generates SHIORI reply (web search auto-triggered if needed)
   4. MemoryEngine auto-extracts and saves any new facts from the exchange
-  5. TTSSpeaker synthesises and plays the reply
+  5. TTSSpeaker synthesises and plays the reply (skip with --no-tts)
 
 Run:
-    python main.py
-    python main.py --model qwen3:14b --think   # enable reasoning mode
-    python main.py --no-memory                 # disable memory for testing
+    python main.py                        # voice mode (default)
+    python main.py --mode text            # text mode — type instead of speak
+    python main.py --mode text --no-tts   # text-only, no audio output
+    python main.py --model qwen3:14b --think
+    python main.py --no-memory
 
 Dependencies:
     pip install faster-whisper sounddevice numpy edge-tts pygame ollama
@@ -28,7 +30,6 @@ from pathlib import Path
 
 from brain.llm_engine import LLMEngine, SHIORI_SYSTEM_PROMPT
 from memory.memory_engine import MemoryEngine
-from voice.stt_listener import STTListener
 from voice.tts_speaker import TTSSpeaker
 
 
@@ -37,14 +38,7 @@ from voice.tts_speaker import TTSSpeaker
 # ---------------------------------------------------------------------------
 
 def _extract_facts(user_input: str, reply: str) -> list[str]:
-    """Heuristically extract saveable facts from the conversation turn.
-
-    This is a simple keyword-triggered extraction — good enough for Phase 2.
-    Phase 4 will replace this with LLM-based fact extraction.
-
-    Triggers on phrases like:
-      "I like / I love / I hate / I don't like / I am / I work / I live / my name is"
-    """
+    """Heuristically extract saveable facts from the conversation turn."""
     triggers = [
         # English
         "i like ", "i love ", "i enjoy ", "i prefer ",
@@ -66,11 +60,10 @@ def _extract_facts(user_input: str, reply: str) -> list[str]:
     lower = user_input.lower()
     for trigger in triggers:
         if trigger in lower:
-            # Capitalise the raw user sentence as the fact
             fact = user_input.strip().rstrip(".")
             if fact and len(fact) < 200:
                 facts.append(fact)
-            break   # one fact per turn to avoid noise
+            break
     return facts
 
 
@@ -83,45 +76,85 @@ def _build_system_prompt_with_memory(memory: MemoryEngine, query: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Input sources
+# ---------------------------------------------------------------------------
+
+def _get_voice_input(stt) -> str:
+    """Capture one utterance from the microphone via STT."""
+    return stt.listen_and_transcribe()
+
+
+def _get_text_input() -> str:
+    """Read one line of keyboard input from the user."""
+    try:
+        sys.stdout.write("You: ")
+        sys.stdout.flush()
+        line = sys.stdin.readline()
+        return line.strip()
+    except (EOFError, KeyboardInterrupt):
+        return ""
+
+
+# ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
 
 async def run(
+    mode: str,
     model: str,
     thinking_mode: bool,
     use_memory: bool,
+    use_tts: bool,
     stt_model: str,
     stt_device: str,
 ) -> None:
-    """Initialise all subsystems and run the SHIORI voice loop."""
+    """Initialise all subsystems and run the SHIORI loop."""
 
     print("\n" + "=" * 55)
-    print("  SHIORI — AI Companion  |  Starting up…")
+    print(f"  SHIORI — AI Companion  |  Mode: {mode.upper()}")
     print("=" * 55 + "\n")
 
     # -- Subsystem init ---------------------------------------------------
     memory  = MemoryEngine() if use_memory else None
-    speaker = TTSSpeaker(auto_detect_lang=False)   # always use Japanese voice
-    stt     = STTListener(model_size=stt_model, device=stt_device)
+    speaker = TTSSpeaker(auto_detect_lang=False) if use_tts else None
+    engine  = LLMEngine(model=model, thinking_mode=thinking_mode)
 
-    # LLMEngine is created fresh each loop turn so memory context updates.
-    # We keep a shared history by re-using the same engine instance.
-    engine = LLMEngine(model=model, thinking_mode=thinking_mode)
+    # Only load STT in voice mode
+    stt = None
+    if mode == "voice":
+        from voice.stt_listener import STTListener
+        stt = STTListener(model_size=stt_model, device=stt_device)
 
     print("\n✅ All systems ready.\n")
-    await speaker.speak("Hei! Aku SHIORI, senang bertemu denganmu~")
+
+    greeting = "Hei! Aku SHIORI, senang bertemu denganmu~"
+    print(f"[SHIORI] {greeting}")
+    if speaker:
+        await speaker.speak(greeting)
+
+    if mode == "text":
+        print("(Text mode: ketik pesan dan tekan Enter. Ketik 'exit' untuk keluar.)\n")
 
     # -- Main loop --------------------------------------------------------
     while True:
         try:
-            # 1. Listen
-            transcript = stt.listen_and_transcribe()
+            # 1. Get input
+            if mode == "voice":
+                transcript = _get_voice_input(stt)
+            else:
+                transcript = _get_text_input()
+
             if not transcript:
                 continue
 
-            print(f"\n[You] {transcript}")
+            # Exit commands for text mode
+            if mode == "text" and transcript.lower() in ("exit", "quit", "keluar", "bye"):
+                break
 
-            # 2. Inject memory into system prompt for this turn
+            if mode == "voice":
+                print(f"\n[You] {transcript}")
+
+            # 2. Inject memory
             if memory:
                 engine.system_prompt = _build_system_prompt_with_memory(
                     memory, transcript
@@ -130,30 +163,31 @@ async def run(
             # 3. Get reply from LLM
             reply = ""
             async for chunk in engine.stream_reply(transcript):
-                reply = chunk   # single-chunk response
+                reply = chunk
 
             if not reply:
                 continue
 
-            print(f"[SHIORI] {reply}")
+            print(f"[SHIORI] {reply}\n")
 
-            # 4. Save any new facts the user just shared
+            # 4. Save new facts
             if memory:
                 for fact in _extract_facts(transcript, reply):
                     memory.remember(fact, source="conversation")
 
-            # 5. Speak
-            await speaker.speak(reply)
+            # 5. Speak (if TTS enabled)
+            if speaker:
+                await speaker.speak(reply)
 
         except KeyboardInterrupt:
             break
         except Exception as exc:
             print(f"\n[ERROR] {exc}", file=sys.stderr)
-            # Don't crash — log and continue listening
             continue
 
     # -- Shutdown ---------------------------------------------------------
-    speaker.stop()
+    if speaker:
+        speaker.stop()
     print("\n[SHIORI] Goodbye! またね~\n")
 
 
@@ -164,6 +198,10 @@ async def run(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="SHIORI — AI Waifu Companion"
+    )
+    parser.add_argument(
+        "--mode", default="voice", choices=["voice", "text"],
+        help="Input mode: voice (mic) or text (keyboard). Default: voice"
     )
     parser.add_argument(
         "--model", default="qwen3:14b",
@@ -178,6 +216,10 @@ if __name__ == "__main__":
         help="Disable long-term memory for this session"
     )
     parser.add_argument(
+        "--no-tts", action="store_true", default=False,
+        help="Disable TTS audio output (text responses only)"
+    )
+    parser.add_argument(
         "--stt-model", default="base",
         help="Whisper STT model size (default: base — multilingual)"
     )
@@ -188,9 +230,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     asyncio.run(run(
+        mode=args.mode,
         model=args.model,
         thinking_mode=args.think,
         use_memory=not args.no_memory,
+        use_tts=not args.no_tts,
         stt_model=args.stt_model,
         stt_device=args.stt_device,
     ))
+

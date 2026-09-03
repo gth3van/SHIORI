@@ -35,16 +35,16 @@
 
 ---
 
-## ⏳ Phase 3 — Tool Use (SHIORI can DO things)
+## ✅ Phase 3 — Tool Use (SHIORI can DO things)
 > Goal: SHIORI can answer real questions and control basic things.
 > "Hey SHIORI, what's the weather?" / "Set a 10 minute timer"
 
-- [ ] `tools/` module folder
-- [ ] `tools/web_search.py` — DuckDuckGo or SerpAPI search
+- [x] `tools/` module folder
+- [x] `tools/web_search.py` — Tavily AI Search (primary) + SearXNG self-hosted (fallback)
+- [x] Tool dispatcher in `brain/llm_engine.py` — auto-detects search intent (EN + ID)
+- [x] Dynamic thinking mode — ON automatically for tool/search tasks
 - [ ] `tools/timer.py` — set/cancel timers with voice confirmation
 - [ ] `tools/system.py` — volume control, open apps, basic PC control
-- [ ] Tool dispatcher in `brain/llm_engine.py` (function calling via Qwen3)
-- [ ] Dynamic thinking mode — ON for tool tasks, OFF for casual chat
 
 ---
 

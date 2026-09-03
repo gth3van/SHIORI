@@ -43,3 +43,6 @@ Thumbs.db
 
 # Pyrefly (contains machine-specific Python interpreter path â€” regenerate per machine)
 pyrefly.toml
+
+# Environment variables (API keys — never commit)
+.env
