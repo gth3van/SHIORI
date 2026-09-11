@@ -61,23 +61,27 @@
 
 ---
 
-## ✅ Phase 5 — Live2D Avatar (Pixi.js)
-> Goal: SHIORI has a visible anime avatar that reacts when she speaks.
+## 🔄 Phase 5 — 3D Avatar (VRM + Three.js) [Infrastructure ✅, Renderer pending]
+> Goal: SHIORI has a 3D VRChat-compatible avatar viewable in any browser.
 > Accessible from any device on the same WiFi network.
 
+**Infrastructure ✅ already built:**
 - [x] `server/app.py` — FastAPI server, serves HTML + WebSocket on port 8080
 - [x] `server/ws_bridge.py` — async broadcast helper (Python → browser)
-- [x] `static/shiori.html` — Pixi.js Live2D viewer page
-- [x] `static/shiori.js` — Live2D controller (load, lip sync, expressions, motions)
 - [x] `main.py` — starts avatar server on boot, fires speaking/idle WS events
 - [x] LAN accessible — open `http://[PC-IP]:8080` on phone/tablet/second screen
-- [ ] Drop your `.moc3` model into `static/model/` to activate avatar
 
-**Design decisions:**
-- Pixi.js v7 + pixi-live2d-display (CDN, no Node.js needed)
-- Replaced VTube Studio plan — more flexible, no extra app required
-- Transparent canvas — works over any background color
-- Auto-reconnects if Python restarts
+**Renderer swap (waiting for model purchase):**
+- [ ] Swap `static/shiori.js` Pixi.js/Live2D → Three.js + `@pixiv/three-vrm`
+- [ ] VRM BlendShape lip sync (mouth shapes: A, O, U)
+- [ ] VRM SpringBone physics (hair + clothing react naturally)
+- [ ] Drop `.vrm` model into `static/model/` to activate
+
+**Notes:**
+- Target: `.vrm` format (VRChat-compatible, works in browser via CDN — no Node.js)
+- If model comes as `.unitypackage` → export via Unity + UniVRM plugin first
+- WebSocket server requires zero changes when swapping the renderer
+
 
 **Architecture:**
 ```
