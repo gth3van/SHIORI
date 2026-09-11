@@ -1,4 +1,4 @@
-# SHIORI - AI Waifu Companion
+# 🌸SHIORI - AI Waifu Companion🌸
 
 > A real-time AI companion with voice interaction, web search, semantic memory, and a 3D avatar (coming soon).
 > Speaks with you, remembers you, and feels alive.
