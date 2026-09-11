@@ -48,14 +48,16 @@
 
 ---
 
-## ⏳ Phase 4 — Smarter Memory (Upgrade)
+## ✅ Phase 4 — Smarter Memory (Upgrade)
 > Goal: SHIORI finds memories by MEANING, not just keywords.
 > "I'm cold" → she remembers "user lives somewhere cold"
 
-- [ ] Replace JSON keyword search with ChromaDB vector database
-- [ ] `memory/vector_store.py` — ChromaDB local embedding store
-- [ ] Embed memories on save, semantic search on recall
-- [ ] Keep JSON vault as human-readable backup/export
+- [x] Replace JSON keyword search with ChromaDB vector database
+- [x] `memory/vector_store.py` — ChromaDB local embedding store (all-MiniLM-L6-v2)
+- [x] Embed memories on save, semantic search on recall (cosine similarity)
+- [x] Keep JSON vault as human-readable backup/export (auto-synced)
+- [x] Auto-migrate existing JSON memories into ChromaDB on first run
+- [x] Graceful fallback to keyword search if ChromaDB not available
 
 ---
 

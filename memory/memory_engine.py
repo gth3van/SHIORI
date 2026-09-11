@@ -1,29 +1,30 @@
-﻿"""
+"""
 memory/memory_engine.py
-───────────────────────
-SHIORI's long-term memory — a simple JSON-based knowledge vault.
+-----------------------
+SHIORI long-term memory -- Phase 4.
 
-Think of it like Obsidian: every fact SHIORI learns is saved as a note,
-searchable by keyword, and injected into the LLM context when relevant.
+Backend:
+  PRIMARY  -> VectorMemoryStore (ChromaDB) -- semantic search by MEANING
+  FALLBACK -> JSON keyword vault            -- if chromadb not installed
 
-Vault file: memory/shiori_memory.json  (auto-created on first run)
+On first run, existing shiori_memory.json entries are auto-migrated into
+ChromaDB. JSON file is kept as a human-readable backup on every write.
 
-Public API
-----------
-remember(fact)               Save a new fact with timestamp + auto-ID
-recall(query, top_n)         Keyword search → returns top N matching facts
-inject_into_prompt(query)    Returns a formatted context string for the LLM
-forget(fact_id)              Delete a fact by its ID
-clear_all()                  Wipe the entire vault (use carefully!)
-show_all()                   Print every memory (for debugging)
+Public API (same as Phase 2, no breaking changes):
+  remember(fact)             Save a new fact
+  recall(query, top_n)       Semantic/keyword search -> top N matches
+  inject_into_prompt(query)  Formatted context string for the LLM
+  forget(fact_id)            Delete a fact by ID
+  clear_all()                Wipe everything
+  show_all()                 Print all memories (debug)
 
-Dependencies: none (standard library only)
+Dependencies:
+    pip install chromadb    (optional -- falls back to keyword if missing)
 """
 
 from __future__ import annotations
 
 import json
-import os
 import re
 import uuid
 from datetime import datetime
@@ -31,24 +32,14 @@ from pathlib import Path
 from typing import Optional
 
 
-# ---------------------------------------------------------------------------
-# Default vault path (sits next to this file)
-# ---------------------------------------------------------------------------
-
 _DEFAULT_VAULT = Path(__file__).parent / "shiori_memory.json"
 
 
 class MemoryEngine:
-    """Persistent keyword-searchable memory vault for SHIORI.
+    """SHIORI long-term memory with semantic search (Phase 4).
 
-    Parameters
-    ----------
-    vault_path:
-        Path to the JSON file used as the memory store.
-        Created automatically if it does not exist.
-    max_inject:
-        Maximum number of memories to inject into the LLM prompt at once.
-        Keeps the context window from bloating.
+    Uses ChromaDB for vector recall if available, falls back to JSON
+    keyword search otherwise. JSON vault kept as backup regardless.
     """
 
     def __init__(
@@ -58,66 +49,71 @@ class MemoryEngine:
     ) -> None:
         self.vault_path = Path(vault_path)
         self.max_inject = max_inject
-        self._memories: list[dict] = []
-        self._load()
-        print(f"[MemoryEngine] Loaded {len(self._memories)} memories from vault.")
+        self._vector: Optional[object] = None
+        self._memories: list[dict] = []   # used by fallback path only
+
+        # Try ChromaDB vector backend
+        try:
+            from memory.vector_store import VectorMemoryStore
+            self._vector = VectorMemoryStore(max_results=max_inject)
+
+            # One-time migration from JSON vault
+            if self.vault_path.exists() and len(self._vector) == 0:
+                migrated = self._vector.import_from_json(self.vault_path)
+                if migrated:
+                    print(f"[MemoryEngine] Migrated {migrated} memories JSON -> ChromaDB.")
+
+            print("[MemoryEngine] Backend: ChromaDB (semantic search)")
+        except Exception as e:
+            print(f"[MemoryEngine] ChromaDB unavailable ({e}), using keyword search.")
+            self._vector = None
+            self._load()
 
     # ------------------------------------------------------------------
-    # Persistence
+    # JSON persistence (fallback path only)
     # ------------------------------------------------------------------
 
     def _load(self) -> None:
-        """Load memories from the JSON vault (creates empty vault if missing)."""
         if self.vault_path.exists():
             try:
                 with open(self.vault_path, encoding="utf-8") as f:
                     self._memories = json.load(f)
             except (json.JSONDecodeError, OSError):
-                print("[MemoryEngine] Warning: vault corrupted, starting fresh.")
+                print("[MemoryEngine] Vault corrupted, starting fresh.")
                 self._memories = []
         else:
             self._memories = []
-            self._save()   # create the file immediately
+            self._save()
 
     def _save(self) -> None:
-        """Write current memories to the JSON vault."""
         self.vault_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.vault_path, "w", encoding="utf-8") as f:
             json.dump(self._memories, f, ensure_ascii=False, indent=2)
+
+    def _sync_json_backup(self) -> None:
+        if self._vector and hasattr(self._vector, "export_to_json"):
+            self._vector.export_to_json(self.vault_path)
 
     # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
 
     def remember(self, fact: str, source: str = "conversation") -> str:
-        """Save a new fact and return its generated ID.
-
-        Parameters
-        ----------
-        fact:
-            The piece of information to remember.
-            e.g. ``"User dislikes spicy food"``
-        source:
-            Where this memory came from (``"conversation"``, ``"user_stated"``, etc.)
-
-        Returns
-        -------
-        str
-            The unique ID of the saved memory.
-        """
+        """Save a new fact. Returns its unique ID."""
+        if self._vector:
+            mem_id = self._vector.remember(fact, source=source)
+            self._sync_json_backup()
+            return mem_id
+        # JSON fallback
         fact = fact.strip()
         if not fact:
             return ""
-
-        # Avoid saving near-duplicate facts (simple dedup)
-        fact_lower = fact.lower()
         for m in self._memories:
-            if m["fact"].lower() == fact_lower:
+            if m["fact"].lower() == fact.lower():
                 print(f"[MemoryEngine] Already known: '{fact}'")
                 return m["id"]
-
         entry = {
-            "id":        str(uuid.uuid4())[:8],   # short readable ID
+            "id":        str(uuid.uuid4())[:8],
             "fact":      fact,
             "source":    source,
             "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -128,108 +124,74 @@ class MemoryEngine:
         return entry["id"]
 
     def recall(self, query: str, top_n: int = 5) -> list[dict]:
-        """Keyword search over the memory vault.
-
-        Splits *query* into individual words and scores each memory by how
-        many query words appear in it.  Returns the top *top_n* matches.
-
-        Parameters
-        ----------
-        query:
-            Free-text search string (e.g. ``"food preference"``)
-        top_n:
-            Maximum number of results to return.
-
-        Returns
-        -------
-        list[dict]
-            Matching memory entries sorted by relevance (most relevant first).
-            Each entry has keys: ``id``, ``fact``, ``source``, ``timestamp``.
-        """
+        """Search memories by meaning (vector) or keyword (fallback)."""
+        if self._vector:
+            return self._vector.recall(query, top_n=top_n)
+        # JSON keyword fallback
         if not query.strip() or not self._memories:
             return []
-
         keywords = set(re.findall(r"\w+", query.lower()))
-
         scored: list[tuple[int, dict]] = []
         for m in self._memories:
-            fact_words = set(re.findall(r"\w+", m["fact"].lower()))
-            score = len(keywords & fact_words)
+            score = len(keywords & set(re.findall(r"\w+", m["fact"].lower())))
             if score > 0:
                 scored.append((score, m))
-
         scored.sort(key=lambda x: x[0], reverse=True)
         return [m for _, m in scored[:top_n]]
 
     def inject_into_prompt(self, query: str) -> str:
-        """Return a formatted memory context string to inject before the LLM call.
-
-        Searches for memories relevant to *query* and formats them as a
-        short block that can be prepended to the system prompt or user message.
-
-        Returns an empty string if no relevant memories are found.
-
-        Example output::
-
-            [SHIORI's memory about the user]
-            - User dislikes spicy food  (2026-09-01)
-            - User works a 9-5 job      (2026-09-01)
-
-        Parameters
-        ----------
-        query:
-            The current user input — used to find contextually relevant facts.
-        """
+        """Return formatted memory context string for the LLM."""
+        if self._vector:
+            return self._vector.inject_into_prompt(query)
         hits = self.recall(query, top_n=self.max_inject)
         if not hits:
             return ""
-
         lines = ["[SHIORI's memory about the user]"]
         for m in hits:
-            date = m["timestamp"][:10]   # YYYY-MM-DD only
-            lines.append(f"- {m['fact']}  ({date})")
-
+            lines.append(f"- {m['fact']}  ({m['timestamp'][:10]})")
         return "\n".join(lines)
 
     def forget(self, fact_id: str) -> bool:
-        """Delete the memory with the given ID.
-
-        Parameters
-        ----------
-        fact_id:
-            The short ID returned by :meth:`remember`.
-
-        Returns
-        -------
-        bool
-            ``True`` if the memory was found and deleted, ``False`` otherwise.
-        """
+        """Delete a memory by ID. Returns True if deleted."""
+        if self._vector:
+            result = self._vector.forget(fact_id)
+            self._sync_json_backup()
+            return result
         before = len(self._memories)
         self._memories = [m for m in self._memories if m["id"] != fact_id]
         if len(self._memories) < before:
             self._save()
-            print(f"[MemoryEngine] Forgot memory [{fact_id}].")
+            print(f"[MemoryEngine] Forgot [{fact_id}].")
             return True
-        print(f"[MemoryEngine] Memory [{fact_id}] not found.")
+        print(f"[MemoryEngine] [{fact_id}] not found.")
         return False
 
     def clear_all(self) -> None:
-        """Wipe the entire memory vault. Use with caution."""
+        """Wipe the entire memory vault."""
+        if self._vector:
+            self._vector.clear_all()
+            self._sync_json_backup()
+            return
         self._memories = []
         self._save()
         print("[MemoryEngine] All memories cleared.")
 
     def show_all(self) -> None:
-        """Print all stored memories to the console (for debugging)."""
+        """Print all memories to console (debugging)."""
+        if self._vector:
+            self._vector.show_all()
+            return
         if not self._memories:
             print("[MemoryEngine] Vault is empty.")
             return
-        print(f"\n[MemoryEngine] Vault — {len(self._memories)} memories:")
+        print(f"\n[MemoryEngine] Vault -- {len(self._memories)} memories:")
         for m in self._memories:
             print(f"  [{m['id']}] {m['timestamp'][:10]}  {m['fact']}")
         print()
 
     def __len__(self) -> int:
+        if self._vector:
+            return len(self._vector)
         return len(self._memories)
 
 
@@ -239,21 +201,22 @@ class MemoryEngine:
 
 if __name__ == "__main__":
     mem = MemoryEngine()
+    print("\n--- MemoryEngine Test (Phase 4 Semantic Search) ---\n")
 
-    print("\n--- Memory Engine Test ---\n")
     mem.remember("User dislikes spicy food")
     mem.remember("User has a pet cat named Mochi")
     mem.remember("User works a 9-5 office job")
     mem.remember("User likes jazz music")
     mem.remember("User lives in Jakarta, Indonesia")
+    mem.remember("User is developing an AI companion called SHIORI")
 
     mem.show_all()
 
-    print("Recall 'food':")
-    for r in mem.recall("food"):
-        print(f"  → {r['fact']}")
+    print("Semantic recall: 'what food does the user hate?'")
+    for r in mem.recall("what food does the user hate?"):
+        print(f"  [{r.get('score', '')}] {r['fact']}")
 
-    print("\nInject for 'what should I eat tonight?':")
-    print(mem.inject_into_prompt("what should I eat tonight?"))
+    print("\nInject for 'aku lapar mau makan apa ya':")
+    print(mem.inject_into_prompt("aku lapar mau makan apa ya"))
 
     print("\n[Done]")
