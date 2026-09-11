@@ -17,3 +17,8 @@ pygame
 tavily-python
 python-dotenv
 httpx
+
+# Phase 5 -- Avatar server
+fastapi
+uvicorn[standard]
+websockets

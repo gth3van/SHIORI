@@ -61,20 +61,23 @@
 
 ---
 
-## ⏳ Phase 5 — Avatar (SHIORI gets a face)
-> Goal: Live2D avatar that reacts and lip-syncs while speaking.
-> Approach: VTube Studio WebSocket API — 100% Python, no C# needed.
+## ✅ Phase 5 — Live2D Avatar (Pixi.js)
+> Goal: SHIORI has a visible anime avatar that reacts when she speaks.
+> Accessible from any device on the same WiFi network.
 
-**Setup needed:**
-- VTube Studio (free on Steam)
-- A Live2D model file (.vtube.model3.json) — buy on Booth.pm or use a free one
+- [x] `server/app.py` — FastAPI server, serves HTML + WebSocket on port 8080
+- [x] `server/ws_bridge.py` — async broadcast helper (Python → browser)
+- [x] `static/shiori.html` — Pixi.js Live2D viewer page
+- [x] `static/shiori.js` — Live2D controller (load, lip sync, expressions, motions)
+- [x] `main.py` — starts avatar server on boot, fires speaking/idle WS events
+- [x] LAN accessible — open `http://[PC-IP]:8080` on phone/tablet/second screen
+- [ ] Drop your `.moc3` model into `static/model/` to activate avatar
 
-- [ ] `avatar/vtube_client.py` — WebSocket client for VTube Studio API
-- [ ] Authenticate with VTube Studio plugin API (token-based)
-- [ ] Lip sync — trigger mouth movement on TTS playback start/stop
-- [ ] Emotion expressions mapped to reply tone (happy, thinking, surprised, idle)
-- [ ] Idle animation loop when waiting for voice input
-- [ ] Hotkey / parameter control for custom expressions
+**Design decisions:**
+- Pixi.js v7 + pixi-live2d-display (CDN, no Node.js needed)
+- Replaced VTube Studio plan — more flexible, no extra app required
+- Transparent canvas — works over any background color
+- Auto-reconnects if Python restarts
 
 **Architecture:**
 ```

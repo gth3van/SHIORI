@@ -46,3 +46,10 @@ pyrefly.toml
 
 # Environment variables (API keys — never commit)
 .env
+
+# Live2D model files (large + licensed)
+static/model/
+!static/model/.gitkeep
+
+# ChromaDB local database
+memory/chroma_db/

@@ -9,28 +9,65 @@ Pipeline (one loop iteration):
   3. LLMEngine generates SHIORI reply (web search auto-triggered if needed)
   4. MemoryEngine auto-extracts and saves any new facts from the exchange
   5. TTSSpeaker synthesises and plays the reply (skip with --no-tts)
+  6. Avatar server broadcasts events to browser (Pixi.js Live2D)
 
 Run:
-    python main.py                        # voice mode (default)
-    python main.py --mode text            # text mode — type instead of speak
-    python main.py --mode text --no-tts   # text-only, no audio output
-    python main.py --model qwen3:14b --think
-    python main.py --no-memory
+    python main.py                           # voice mode + avatar server
+    python main.py --mode text               # text mode — type instead of speak
+    python main.py --mode text --no-tts      # text-only, no audio
+    python main.py --no-avatar               # skip avatar server
+    python main.py --port 8080               # custom avatar server port
+
+Open browser at http://localhost:8080 (or your LAN IP from another device).
 
 Dependencies:
     pip install faster-whisper sounddevice numpy edge-tts pygame ollama
+    pip install fastapi uvicorn websockets
 """
 
 from __future__ import annotations
 
 import asyncio
 import argparse
+import socket
 import sys
 from pathlib import Path
 
 from brain.llm_engine import LLMEngine, SHIORI_SYSTEM_PROMPT
 from memory.memory_engine import MemoryEngine
 from voice.tts_speaker import TTSSpeaker
+
+
+# ---------------------------------------------------------------------------
+# Avatar server helpers
+# ---------------------------------------------------------------------------
+
+def _get_local_ip() -> str:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:
+        return "localhost"
+
+
+async def _start_avatar_server(port: int) -> None:
+    """Start the FastAPI/uvicorn avatar server as a background asyncio task."""
+    try:
+        import uvicorn
+        from server.app import app
+        config = uvicorn.Config(
+            app,
+            host="0.0.0.0",
+            port=port,
+            log_level="warning",   # suppress uvicorn access logs
+        )
+        server = uvicorn.Server(config)
+        await server.serve()
+    except ImportError:
+        print("[Avatar] uvicorn/fastapi not installed — avatar server disabled.")
+    except Exception as e:
+        print(f"[Avatar] Server error: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -105,6 +142,8 @@ async def run(
     thinking_mode: bool,
     use_memory: bool,
     use_tts: bool,
+    use_avatar: bool,
+    avatar_port: int,
     stt_model: str,
     stt_device: str,
 ) -> None:
@@ -113,6 +152,13 @@ async def run(
     print("\n" + "=" * 55)
     print(f"  SHIORI — AI Companion  |  Mode: {mode.upper()}")
     print("=" * 55 + "\n")
+
+    # -- Avatar server (background task) ----------------------------------
+    if use_avatar:
+        asyncio.create_task(_start_avatar_server(avatar_port))
+        local_ip = _get_local_ip()
+        print(f"[Avatar] Server starting on http://{local_ip}:{avatar_port}")
+        print(f"[Avatar] Open on any device: http://{local_ip}:{avatar_port}\n")
 
     # -- Subsystem init ---------------------------------------------------
     memory  = MemoryEngine() if use_memory else None
@@ -127,10 +173,21 @@ async def run(
 
     print("\n✅ All systems ready.\n")
 
+    # WS broadcast helper (no-op if avatar disabled)
+    async def ws_send(event: dict) -> None:
+        if use_avatar:
+            try:
+                from server.ws_bridge import broadcast
+                await broadcast(event)
+            except Exception:
+                pass
+
     greeting = "Hei! Aku SHIORI, senang bertemu denganmu~"
     print(f"[SHIORI] {greeting}")
     if speaker:
+        await ws_send({"type": "speaking", "duration_ms": 2000})
         await speaker.speak(greeting)
+        await ws_send({"type": "idle"})
 
     if mode == "text":
         print("(Text mode: ketik pesan dan tekan Enter. Ketik 'exit' untuk keluar.)\n")
@@ -177,7 +234,11 @@ async def run(
 
             # 5. Speak (if TTS enabled)
             if speaker:
+                # Estimate speech duration from text length (~150 wpm avg)
+                est_ms = max(1000, len(reply.split()) * 400)
+                await ws_send({"type": "speaking", "duration_ms": est_ms})
                 await speaker.speak(reply)
+                await ws_send({"type": "idle"})
 
         except KeyboardInterrupt:
             break
@@ -220,6 +281,14 @@ if __name__ == "__main__":
         help="Disable TTS audio output (text responses only)"
     )
     parser.add_argument(
+        "--no-avatar", action="store_true", default=False,
+        help="Disable the Pixi.js Live2D avatar web server"
+    )
+    parser.add_argument(
+        "--port", type=int, default=8080,
+        help="Avatar server port (default: 8080)"
+    )
+    parser.add_argument(
         "--stt-model", default="base",
         help="Whisper STT model size (default: base — multilingual)"
     )
@@ -235,7 +304,8 @@ if __name__ == "__main__":
         thinking_mode=args.think,
         use_memory=not args.no_memory,
         use_tts=not args.no_tts,
+        use_avatar=not args.no_avatar,
+        avatar_port=args.port,
         stt_model=args.stt_model,
         stt_device=args.stt_device,
     ))
-
