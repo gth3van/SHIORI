@@ -23,10 +23,12 @@
 <body>
   <div id="status">Connecting to SHIORI...</div>
 
-  <!-- Pixi.js v7 -->
+  <!-- Step 1: Cubism 4 Core runtime (MUST load first) -->
+  <script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
+  <!-- Step 2: Pixi.js v7 -->
   <script src="https://cdn.jsdelivr.net/npm/pixi.js@7/dist/pixi.min.js"></script>
-  <!-- pixi-live2d-display (Cubism 4 / .moc3 support) -->
-  <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display/dist/cubism4.min.js"></script>
+  <!-- Step 3: pixi-live2d-display Cubism 4 bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js"></script>
 
   <script src="/static/shiori.js"></script>
 </body>
