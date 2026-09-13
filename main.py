@@ -155,8 +155,9 @@ async def run(
     print("=" * 55 + "\n")
 
     # -- Avatar server (background task) ----------------------------------
+    avatar_task = None
     if use_avatar:
-        asyncio.create_task(_start_avatar_server(avatar_port))
+        avatar_task = asyncio.create_task(_start_avatar_server(avatar_port))
         local_ip = _get_local_ip()
         print(f"[Avatar] Server starting on http://{local_ip}:{avatar_port}")
         print(f"[Avatar] Open on any device: http://{local_ip}:{avatar_port}\n")
@@ -183,7 +184,7 @@ async def run(
             except Exception:
                 pass
 
-    greeting = "Hei! Aku SHIORI, senang bertemu denganmu~"
+    greeting = "Hello Aku SHIORI, senang bertemu denganmu~"
     print(f"[SHIORI] {greeting}")
     if speaker:
         await ws_send({"type": "speaking", "duration_ms": 2000})
@@ -250,6 +251,12 @@ async def run(
     # -- Shutdown ---------------------------------------------------------
     if speaker:
         speaker.stop()
+    if avatar_task and not avatar_task.done():
+        avatar_task.cancel()
+        try:
+            await avatar_task
+        except (asyncio.CancelledError, Exception):
+            pass   # expected on clean shutdown
     print("\n[SHIORI] Goodbye! またね~\n")
 
 
