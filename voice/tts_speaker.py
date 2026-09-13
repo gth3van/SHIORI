@@ -82,20 +82,29 @@ class TTSSpeaker:
         rate: str = "+0%",
         volume: str = "+0%",
         auto_detect_lang: bool = True,
+        pygame_volume: float = 0.5,   # 0.0 (silent) → 1.0 (max), default 50%
     ) -> None:
         self.voice_map = voice_map
         self.rate = rate
         self.volume = volume
         self.auto_detect_lang = auto_detect_lang
+        self._pygame_volume = max(0.0, min(1.0, pygame_volume))
 
         # Initialise pygame mixer for mp3 playback
         pygame.mixer.init()
+        pygame.mixer.music.set_volume(self._pygame_volume)
 
         # Async queue: items are plain strings (text to speak)
         self._queue: asyncio.Queue[Optional[str]] = asyncio.Queue()
         self._is_speaking: bool = False
 
-        print("[TTSSpeaker] Ready.")
+        print(f"[TTSSpeaker] Ready. Volume: {int(self._pygame_volume * 100)}%")
+
+    def set_volume(self, level: float) -> None:
+        """Set playback volume. level is 0.0 (silent) to 1.0 (max)."""
+        self._pygame_volume = max(0.0, min(1.0, level))
+        pygame.mixer.music.set_volume(self._pygame_volume)
+        print(f"[TTSSpeaker] Volume set to {int(self._pygame_volume * 100)}%")
 
     # ------------------------------------------------------------------
     # Private helpers

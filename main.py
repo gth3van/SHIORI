@@ -142,6 +142,7 @@ async def run(
     thinking_mode: bool,
     use_memory: bool,
     use_tts: bool,
+    volume: float,
     use_avatar: bool,
     avatar_port: int,
     stt_model: str,
@@ -162,7 +163,7 @@ async def run(
 
     # -- Subsystem init ---------------------------------------------------
     memory  = MemoryEngine() if use_memory else None
-    speaker = TTSSpeaker(auto_detect_lang=False) if use_tts else None
+    speaker = TTSSpeaker(auto_detect_lang=False, pygame_volume=volume) if use_tts else None
     engine  = LLMEngine(model=model, thinking_mode=thinking_mode)
 
     # Only load STT in voice mode
@@ -281,6 +282,10 @@ if __name__ == "__main__":
         help="Disable TTS audio output (text responses only)"
     )
     parser.add_argument(
+        "--volume", type=int, default=50, metavar="0-100",
+        help="Playback volume 0-100 (default: 50)"
+    )
+    parser.add_argument(
         "--no-avatar", action="store_true", default=False,
         help="Disable the Pixi.js Live2D avatar web server"
     )
@@ -304,6 +309,7 @@ if __name__ == "__main__":
         thinking_mode=args.think,
         use_memory=not args.no_memory,
         use_tts=not args.no_tts,
+        volume=max(0, min(100, args.volume)) / 100.0,
         use_avatar=not args.no_avatar,
         avatar_port=args.port,
         stt_model=args.stt_model,
