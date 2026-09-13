@@ -6,30 +6,26 @@
   <title>SHIORI</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: transparent;
+    html, body {
       width: 100vw; height: 100vh;
       overflow: hidden;
-      display: flex; align-items: center; justify-content: center;
+      background: transparent;
     }
-    canvas { display: block; }
     #status {
-      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
-      color: rgba(255,255,255,0.5); font-family: sans-serif; font-size: 13px;
+      position: fixed; bottom: 12px; left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.6);
+      font-family: sans-serif; font-size: 13px;
       pointer-events: none;
+      z-index: 9999;
     }
   </style>
 </head>
 <body>
-  <div id="status">Connecting to SHIORI...</div>
+  <div id="status">Loading SHIORI...</div>
 
-  <!-- Step 1: Cubism 4 Core runtime (MUST load first) -->
-  <script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
-  <!-- Step 2: Pixi.js v7 -->
-  <script src="https://cdn.jsdelivr.net/npm/pixi.js@7/dist/pixi.min.js"></script>
-  <!-- Step 3: pixi-live2d-display Cubism 4 bundle -->
-  <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js"></script>
-
+  <!-- oh-my-live2d: all-in-one, Cubism Core bundled, no extra download needed -->
+  <script src="/static/oh-my-live2d.min.js"></script>
   <script src="/static/shiori.js"></script>
 </body>
 </html>
