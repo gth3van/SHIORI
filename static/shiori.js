@@ -14,7 +14,7 @@
 
 // ── Config ───────────────────────────────────────────────────────────────────
 const WS_URL        = `ws://${location.host}/ws`;
-const DEFAULT_MODEL = "/static/model/model.model3.json"; // user drops model here
+const DEFAULT_MODEL = "/static/model/ariu/ariu.model3.json";
 const RECONNECT_MS  = 3000;
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -56,22 +56,25 @@ async function tryLoadModel(path) {
     model = live2dModel;
     app.stage.addChild(model);
     fitModel();
-    setStatus("SHIORI ready ✨");
+    setStatus("");   // hide status once model is loaded
     console.log("[SHIORI] Model loaded:", path);
   } catch (e) {
-    console.warn("[SHIORI] No model found at", path, "— running without avatar.");
-    setStatus("No model loaded. Drop a .model3.json into static/model/");
+    console.warn("[SHIORI] Could not load model:", e);
+    setStatus("Model not found — check static/model/ariu/");
   }
 }
 
 function fitModel() {
   if (!model) return;
-  const scaleX = window.innerWidth  / model.width;
-  const scaleY = window.innerHeight / model.height;
-  const scale  = Math.min(scaleX, scaleY) * 0.9;
+  // Scale to fill ~90% of the shorter screen dimension
+  const scale = Math.min(
+    window.innerWidth  / model.internalModel.originalWidth,
+    window.innerHeight / model.internalModel.originalHeight
+  ) * 0.9;
   model.scale.set(scale);
-  model.x = (window.innerWidth  - model.width  * scale) / 2;
-  model.y = (window.innerHeight - model.height * scale) / 2;
+  // Center on screen
+  model.x = (window.innerWidth  - model.internalModel.originalWidth  * scale) / 2;
+  model.y = (window.innerHeight - model.internalModel.originalHeight * scale) / 2;
 }
 
 // ── Lip sync ──────────────────────────────────────────────────────────────────
