@@ -53,3 +53,6 @@ static/model/
 
 # ChromaDB local database
 memory/chroma_db/
+
+# Original model source folder (large, licensed)
+Allium*/
