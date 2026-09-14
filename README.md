@@ -1,24 +1,24 @@
-# 🌸SHIORI - AI Waifu Companion🌸
+# 🌸 SHIORI — AI Waifu Companion
 
-> A real-time AI companion with voice interaction, web search, semantic memory, and a 3D avatar (coming soon).
-> Speaks with you, remembers you, and feels alive.
+> Locally-run AI companion dengan voice interaction, semantic memory, web search, dan browser avatar.
+> Kuudere. Sarkas. Suka tidur. Kayak kucing.
 
-*Last updated: 2026-09-12*
+*Last updated: 2026-09-14*
 
 ---
 
 ## What is SHIORI?
 
-SHIORI is a locally-run AI waifu companion that you talk to using your voice -- or by typing.
-She listens, thinks, searches the web when needed, and talks back -- in real time, no cloud required.
+SHIORI adalah AI companion yang jalan 100% lokal di PC kamu — ga ada cloud, ga ada subscription.
+Lo bisa ngobrol via suara atau ketikan, dia jawab dengan suara anime Jepang, ingat siapa kamu, dan bisa searching internet kalau butuh info real-time.
 
-- **Voice + text input** -- speak via mic or type (`--mode text`)
-- **Multilingual STT** -- English, Indonesian, Japanese via faster-whisper
-- **Semantic memory** -- remembers you across sessions using ChromaDB vector search
-- **Live web search** -- auto-detects when to search (Tavily AI + SearXNG fallback)
-- **Local LLM** -- Ollama + Qwen3:14b, fully private, no API key needed
-- **Japanese anime voice** -- Edge-TTS NanamiNeural, always
-- **Browser avatar server** -- open on phone, tablet, or second screen over WiFi
+- **Voice + text mode** — mic atau keyboard (`--mode text`)
+- **Multilingual STT** — Indo, Inggris, Jepang via faster-whisper
+- **Semantic memory** — ingat kamu lintas sesi, dicari by meaning (bukan keyword)
+- **Auto web search** — detect sendiri kapan perlu search (Tavily + SearXNG fallback)
+- **Local LLM** — Ollama + Qwen3:8b, fully private
+- **Anime voice** — Edge-TTS NanamiNeural (Japanese)
+- **Browser avatar** — buka di HP/tablet/layar lain lewat WiFi, ada loading screen
 
 ---
 
@@ -28,19 +28,19 @@ She listens, thinks, searches the web when needed, and talks back -- in real tim
 Mic / Keyboard
       |
       v
- STT Listener          faster-whisper (local, multilingual)
+ STT Listener     faster-whisper (local, multilingual)
       |
       v
- Memory Engine         ChromaDB vector search -- recalls by MEANING not keywords
+ Memory Engine    ChromaDB vector search — recall by meaning
       |
       v
- LLM Brain             Ollama + Qwen3:14b (local, no API key)
-      |  <-> auto web search if needed (Tavily -> SearXNG fallback)
+ LLM Brain        Ollama + Qwen3:8b (local)
+      |  <-> auto web search (Tavily → SearXNG)
       v
- TTS Speaker           Edge-TTS -> NanamiNeural (Japanese voice)
+ TTS Speaker      Edge-TTS → NanamiNeural
       |
       v
- Speaker output + WebSocket -> Browser avatar (Pixi.js / Three.js)
+ Audio + WebSocket → Browser avatar (oh-my-live2d, Live2D .moc3)
 ```
 
 ---
@@ -49,33 +49,34 @@ Mic / Keyboard
 
 ```
 SHIORI/
-├── main.py                  # Central asyncio orchestrator
-├── requirements.txt         # Python dependencies
-├── ROADMAP.md               # Feature roadmap & build checklist
-├── .env.example             # API key template (copy to .env)
+├── main.py                  # Asyncio orchestrator — semua sistem di sini
+├── requirements.txt
+├── ROADMAP.md
+├── .env.example             # Copy ke .env, isi Tavily API key
 │
 ├── brain/
-│   └── llm_engine.py        # Ollama LLM + SHIORI persona + tool dispatcher
+│   └── llm_engine.py        # LLM + SHIORI persona (kuudere) + search dispatcher
 │
 ├── voice/
-│   ├── stt_listener.py      # Mic capture + faster-whisper STT
-│   └── tts_speaker.py       # Edge-TTS synthesis + pygame playback
+│   ├── stt_listener.py      # Mic + faster-whisper STT
+│   └── tts_speaker.py       # Edge-TTS + pygame playback + volume control
 │
 ├── memory/
-│   ├── memory_engine.py     # Semantic memory (ChromaDB primary, JSON fallback)
-│   └── vector_store.py      # ChromaDB vector store wrapper
+│   ├── memory_engine.py     # ChromaDB primary, JSON fallback
+│   └── vector_store.py      # ChromaDB wrapper
 │
 ├── tools/
-│   └── web_search.py        # Tavily AI search + SearXNG fallback
+│   └── web_search.py        # Tavily + SearXNG fallback
 │
 └── server/
-    ├── app.py               # FastAPI avatar server (port 8080)
-    └── ws_bridge.py         # WebSocket broadcast (Python -> browser)
+    ├── app.py               # FastAPI avatar server (default port 8765)
+    └── ws_bridge.py         # WebSocket broadcast → browser
 
 static/
-├── shiori.html              # Avatar viewer page
-├── shiori.js                # Pixi.js controller + WebSocket client
-└── model/                   # Drop your .vrm or .moc3 model here (gitignored)
+├── shiori.html              # Avatar viewer + loading screen
+├── shiori.js                # oh-my-live2d controller + WebSocket client
+├── oh-my-live2d.min.js      # Bundled renderer (Cubism Core included)
+└── model/                   # .moc3 model files (gitignored)
 ```
 
 ---
@@ -86,113 +87,119 @@ static/
 
 - Python 3.10+
 - [Ollama](https://ollama.com) installed and running
-- A working microphone (optional -- text mode works without one)
 
-### 2. Pull the LLM model
+### 2. Pull LLM model
 
 ```bash
+ollama pull qwen3:8b
+# Untuk soal teknis / engineering — lebih akurat tapi lebih lambat:
 ollama pull qwen3:14b
 ```
 
-> **Recommended specs:** RTX GPU with 8GB+ VRAM. `qwen3:14b` fits in 12GB VRAM.
-> For lower-spec machines, use `qwen3:4b` instead.
-
-### 3. Install Python dependencies
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Set up web search (optional)
+### 4. Web search (optional)
 
 ```bash
 cp .env.example .env
-# Edit .env and add your Tavily API key (free at https://app.tavily.com)
+# Isi TAVILY_API_KEY — free di https://app.tavily.com
 ```
 
-### 5. Run SHIORI
+### 5. Jalanin
 
 ```bash
-python main.py                       # voice mode (default)
-python main.py --mode text           # type instead of speaking
-python main.py --mode text --no-tts  # silent text mode
+python main.py                 # voice mode (default)
+python main.py --mode text     # text mode
 ```
 
-Then open **http://localhost:8080** in any browser for the avatar viewer.
-From phone/tablet on the same WiFi: **http://[YOUR-PC-IP]:8080**
+Buka **`http://localhost:8765`** — loading screen muncul, Ariu keluar.
+Dari HP/tablet di WiFi yang sama: **`http://[IP-PC]:8765`**
 
 ---
 
 ## CLI Options
 
+| Flag | Default | Keterangan |
+|------|---------|------------|
+| `--mode` | `voice` | `voice` (mic) atau `text` (keyboard) |
+| `--volume` | `50` | Volume 0–100 |
+| `--model` | `qwen3:8b` | Ollama model tag |
+| `--think` | off | Aktifkan chain-of-thought (lebih lambat, lebih akurat) |
+| `--no-tts` | — | Matikan audio output |
+| `--no-avatar` | — | Skip avatar server |
+| `--port` | `8765` | Port avatar server |
+| `--no-memory` | — | Disable long-term memory |
+| `--stt-model` | `base` | Whisper model size (`tiny`, `base`, `small`, `medium`) |
+| `--stt-device` | `cpu` | `cpu` atau `cuda` |
+
+**Contoh:**
 ```bash
-python main.py --mode text        # keyboard input instead of mic
-python main.py --no-tts           # disable audio output
-python main.py --no-avatar        # skip avatar web server
-python main.py --port 9090        # custom avatar server port
-python main.py --think            # enable Qwen3 thinking mode (smarter, slower)
-python main.py --no-memory        # disable long-term memory
-python main.py --model qwen3:4b   # use a lighter LLM model
-python main.py --stt-model small  # more accurate STT
-python main.py --stt-device cuda  # run STT on GPU
+python main.py --mode text --volume 30
+python main.py --mode voice --model qwen3:14b --think   # engineering mode
+python main.py --mode text --no-tts --no-avatar         # pure CLI mode
 ```
 
 ---
 
-## Semantic Memory (Phase 4)
+## Personality
 
-SHIORI remembers facts across sessions using **ChromaDB vector embeddings**.
-Memory is searched by *meaning*, not just keywords -- so she understands context
-even when you phrase things differently.
+SHIORI itu **kuudere** — kelihatan dingin dan cuek, tapi sebenernya perhatian (cuma ga mau kelihatan). Sarkas. Suka tidur. Ga suka direcokin tanpa alasan. Kayak kucing.
 
-```
-You:    "aku lagi ngerjain project tech"
-SHIORI: remembers -> "User is developing an AI companion called SHIORI"
-        (matched by meaning, not exact keywords)
-```
-
-Memory stored locally in `memory/chroma_db/` + JSON backup in `memory/shiori_memory.json`.
-Both are gitignored. Your data never leaves your machine.
+Ngomongnya campur-campur: Indo, Inggris, Jepang — tergantung mood. Dia punya opini sendiri, bisa nolak, bisa roasting kamu, tapi kalau bantu ya bantu beneran.
 
 ---
 
-## Web Search (Phase 3)
+## Semantic Memory
 
-SHIORI auto-detects when she needs real-world information and searches the web:
+ChromaDB vector search — dicari by **meaning**, bukan keyword exact.
 
 ```
-You:    "Shiori, cuaca Jakarta hari ini?"
-SHIORI: -> detects search intent -> Tavily search -> answers with live data
+Kamu:   "aku lagi ngerjain project tech"
+Shiori: ingat → "User is developing an AI companion called SHIORI"
+        (matched by meaning, phrasing-nya beda pun ketemu)
 ```
 
-**Triggers (EN + ID):** search, find, what is, who is, latest, today,
-cari, apa itu, siapa, terbaru, berita, cuaca, harga, ...
+Disimpen lokal di `memory/chroma_db/` + JSON backup. Gitignored.
 
-Set up in `.env`:
+---
+
+## Web Search
+
+Auto-detect kapan perlu search. Trigger-nya luas — termasuk slang Indo:
+
 ```
-TAVILY_API_KEY=tvly-your-key-here   # primary (free at app.tavily.com)
-SEARXNG_URL=http://localhost:8080   # fallback (self-hosted, optional)
+"shiori tau Taskbar Heroes ga?"  → search otomatis
+"apaan tuh Blue Archive?"        → search otomatis
+"cuaca Jakarta sekarang?"        → search otomatis
+```
+
+Kalau mau paksa search: **"cariin / cek / search [topik]"**
+
+Setup di `.env`:
+```
+TAVILY_API_KEY=tvly-...         # primary (free)
+SEARXNG_URL=http://localhost:...  # fallback (optional, self-hosted)
 ```
 
 ---
 
-## Avatar (Phase 5 -- In Progress)
+## Avatar
 
-SHIORI serves a browser-based avatar viewer over your local network.
-Any device on the same WiFi can open it.
+Browser-based Live2D avatar via **oh-my-live2d** (Cubism Core bundled, no extra install).
+Jalan di thread sendiri — ga ganggu voice loop.
 
-```
+```bash
 python main.py
-# -> open http://[PC-IP]:8080 on phone, tablet, or second screen
+# → http://localhost:8765  (PC)
+# → http://[IP]:8765       (HP/tablet/layar lain)
 ```
 
-**Avatar setup:**
-1. Get a `.vrm` (VRChat-compatible) or `.moc3` (Live2D) model from [Booth.pm](https://booth.pm)
-2. Drop it into `static/model/`
-3. Refresh the browser -- avatar animates when SHIORI speaks
-
-> Currently using Pixi.js + pixi-live2d-display.
-> Switching to Three.js + `@pixiv/three-vrm` for 3D VRM support once model is ready.
+Loading screen nunjukin progress: library → model → WebSocket → ready.
+Mulut Ariu gerak waktu Shiori ngomong (lip sync via requestAnimationFrame).
 
 ---
 
@@ -200,41 +207,42 @@ python main.py
 
 | Phase | Feature | Status |
 |-------|---------|--------|
-| 1 | Core voice loop (STT -> LLM -> TTS) | Done |
-| 2 | Long-term memory (JSON vault) | Done |
-| 3 | Web search (Tavily + SearXNG), text mode | Done |
-| 4 | Semantic memory -- ChromaDB vector search | Done |
-| 5 | Browser avatar server (FastAPI + WebSocket + Pixi.js) | Server done, model pending |
-| 6 | Full JARVIS mode -- agentic tasks, PC automation | Planned |
-
-See [ROADMAP.md](ROADMAP.md) for the full detailed checklist.
+| 1 | Core voice loop (STT → LLM → TTS) | ✅ Done |
+| 2 | Long-term memory (JSON) | ✅ Done |
+| 3 | Web search + text mode | ✅ Done |
+| 4 | Semantic memory (ChromaDB) | ✅ Done |
+| 5 | Browser avatar (Live2D, WebSocket, loading screen) | ✅ Done |
+| 5.5 | RVC voice conversion | 🔄 In progress |
+| 6 | Full JARVIS mode — agentic tasks, PC automation | Planned |
+| 7 | 3D VRM avatar (Three.js + three-vrm) | Planned |
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
+| Layer | Tech |
+|-------|------|
 | Language | Python 3.10+ |
-| STT | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (local, multilingual) |
-| LLM | [Ollama](https://ollama.com) + [Qwen3:14b](https://qwen.readthedocs.io) (local) |
-| TTS | [Edge-TTS](https://github.com/rany2/edge-tts) -- NanamiNeural (Japanese) |
-| Memory | [ChromaDB](https://www.trychroma.com) vector search + JSON backup |
-| Web search | [Tavily AI](https://tavily.com) + [SearXNG](https://searxng.github.io/searxng/) fallback |
-| Avatar server | [FastAPI](https://fastapi.tiangolo.com) + WebSocket |
-| Avatar renderer | Pixi.js + pixi-live2d-display -> Three.js + three-vrm (pending) |
-| Audio playback | pygame |
+| STT | faster-whisper (local) |
+| LLM | Ollama + Qwen3:8b (local) |
+| TTS | Edge-TTS NanamiNeural |
+| Voice conversion | RVC (in progress) |
+| Memory | ChromaDB + JSON backup |
+| Web search | Tavily AI + SearXNG fallback |
+| Avatar server | FastAPI + WebSocket (daemon thread) |
+| Avatar renderer | oh-my-live2d (Cubism 4, all-in-one) |
+| Audio | pygame |
 
 ---
 
 ## Notes
 
-- Runs **100% locally** -- no OpenAI API, no subscriptions required
-- Web search is the only optional cloud service (Tavily free tier: 1000 req/month)
-- Japanese voice (NanamiNeural) is used for all languages by design
-- Thinking mode OFF by default for real-time feel -- use `--think` for harder questions
-- All personal data (memory, API keys) is gitignored and stays on your machine
+- 100% lokal — no OpenAI, no cloud LLM, no subscription
+- Web search adalah satu-satunya optional cloud (Tavily free: 1000 req/bulan)
+- Japanese voice by design — biar konsisten sama persona karakter
+- `--think` OFF default buat real-time feel, ON buat soal teknis
+- Semua data personal (memory, API keys) gitignored
 
 ---
 
-*Built with love -- 2026*
+*Built with love — 2026*
