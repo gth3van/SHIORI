@@ -34,6 +34,12 @@ async def index():
     return FileResponse(str(_STATIC_DIR / "shiori.html"))
 
 
+@app.get("/debug")
+async def debug():
+    """Serve the debug/diagnostic page."""
+    return FileResponse(str(_STATIC_DIR / "debug.html"))
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     """WebSocket endpoint — each browser tab gets one connection."""

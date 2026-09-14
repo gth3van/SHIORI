@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body { background: #111; color: #eee; font-family: monospace; padding: 20px; }
+  .ok   { color: #4f4; }
+  .fail { color: #f44; }
+  .wait { color: #ff4; }
+  h2    { color: #aaf; margin-top: 20px; }
+  pre   { background: #222; padding: 10px; border-radius: 4px; font-size: 12px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>SHIORI Debug Page</h1>
+<div id="out"></div>
+
+<script src="/static/oh-my-live2d.min.js"></script>
+<script>
+const out = document.getElementById("out");
+function log(msg, cls) {
+  const d = document.createElement("div");
+  d.innerHTML = msg;
+  if (cls) d.className = cls;
+  out.appendChild(d);
+}
+
+// Step 1
+log("<h2>Step 1: Library load</h2>");
+if (typeof OML2D !== "undefined") {
+  log("OML2D loaded OK. Keys: " + Object.keys(OML2D).join(", "), "ok");
+} else {
+  log("OML2D is NOT defined - oh-my-live2d script failed to load!", "fail");
+}
+
+// Step 2
+log("<h2>Step 2: Model file access</h2>");
+fetch("/static/model/ariu/ariu.model3.json")
+  .then(function(r) {
+    if (r.ok) {
+      log("model3.json OK (HTTP " + r.status + ")", "ok");
+    } else {
+      log("model3.json HTTP error: " + r.status, "fail");
+    }
+    return r.ok ? r.json() : null;
+  })
+  .then(function(j) {
+    if (j) log("<pre>" + JSON.stringify(j, null, 2).substring(0, 500) + "</pre>");
+  })
+  .catch(function(e) { log("model3.json fetch error: " + e, "fail"); });
+
+// Step 3
+log("<h2>Step 3: WebSocket</h2>");
+try {
+  var ws = new WebSocket("ws://" + location.host + "/ws");
+  ws.onopen  = function() { log("WebSocket connected OK", "ok"); };
+  ws.onerror = function() { log("WebSocket error - is Python running?", "fail"); };
+} catch(e) { log("WebSocket exception: " + e, "fail"); }
+
+// Step 4
+log("<h2>Step 4: Model render</h2>");
+if (typeof OML2D !== "undefined") {
+  var fn = OML2D.loadOml2d || OML2D.default;
+  if (typeof fn === "function") {
+    log("Calling loadOml2d...", "wait");
+    fn({
+      mobileDisplay: true,
+      models: [{ path: "/static/model/ariu/ariu.model3.json", scale: 0.1 }]
+    }).then(function(inst) {
+      log("Model loaded OK! Type: " + typeof inst, "ok");
+    }).catch(function(e) {
+      log("Model FAILED: " + e, "fail");
+    });
+  } else {
+    log("loadOml2d is not a function. OML2D keys: " + JSON.stringify(Object.keys(OML2D)), "fail");
+  }
+} else {
+  log("Skipped - OML2D not defined", "fail");
+}
+</script>
+</body>
+</html>

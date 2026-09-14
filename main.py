@@ -297,8 +297,8 @@ if __name__ == "__main__":
         help="Disable the Pixi.js Live2D avatar web server"
     )
     parser.add_argument(
-        "--port", type=int, default=8080,
-        help="Avatar server port (default: 8080)"
+        "--port", type=int, default=8765,
+        help="Avatar server port (default: 8765)"
     )
     parser.add_argument(
         "--stt-model", default="base",
