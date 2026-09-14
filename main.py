@@ -276,8 +276,8 @@ if __name__ == "__main__":
         help="Input mode: voice (mic) or text (keyboard). Default: voice"
     )
     parser.add_argument(
-        "--model", default="qwen3:14b",
-        help="Ollama model tag (default: qwen3:14b)"
+        "--model", default="qwen3:8b",
+        help="Ollama model tag (default: qwen3:8b)"
     )
     parser.add_argument(
         "--think", action="store_true", default=False,
