@@ -192,27 +192,54 @@ class LLMEngine:
 
     # ------------------------------------------------------------------
     # Tool dispatcher helpers
-    # ------------------------------------------------------------------
-
-    # Keywords that signal the user wants real-world / current information
+        # Keywords that signal the user wants real-world / current information
     _SEARCH_TRIGGERS_EN: list[str] = [
         "search", "look up", "find out", "what is", "what are", "who is",
         "where is", "when is", "how much", "how many", "latest", "recent",
         "news", "weather", "price", "score", "today", "current", "right now",
-        "tell me about", "do you know", "what happened",
+        "tell me about", "do you know", "what happened", "have you heard",
+        "heard of", "know about", "ever heard",
     ]
     _SEARCH_TRIGGERS_ID: list[str] = [
-        "cari", "cariin", "cek", "cari tau", "apa itu", "siapa itu",
-        "dimana", "kapan", "berapa", "berita", "cuaca", "harga", "terbaru",
-        "terkini", "sekarang", "hari ini", "tolong cari", "tolong cek",
-        "tau ga", "tau tidak", "gimana kabar",
+        # explicit search
+        "cari", "cariin", "cek", "cari tau", "googling", "search",
+        # "apa" questions
+        "apa itu", "apaan", "apa tuh", "apa sih", "apa ya",
+        # "siapa" questions
+        "siapa itu", "siapa sih", "siapa tuh",
+        # "tau" — paling sering kelewat
+        "tau ga", "tau gak", "tau nggak", "tau tidak", "tau soal",
+        "kamu tau", "lo tau", "lu tau", "shiori tau",
+        "pernah denger", "pernah tau", "pernah dengar",
+        # info / berita
+        "berita", "info", "informasi", "update", "terbaru", "terkini",
+        "sekarang", "hari ini", "cuaca", "harga", "berapa",
+        # game / tech / entertainment
+        "game", "aplikasi", "app", "software", "film", "anime", "manga",
+        "lagu", "artis", "band",
+        # misc
+        "tolong cari", "tolong cek", "gimana kabar", "jelasin tentang",
     ]
 
+    # Regex to catch proper nouns — e.g. "Taskbar Heroes", "Blue Archive"
+    _PROPER_NOUN_RE = re.compile(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b')
+
     def _detect_search_intent(self, text: str) -> bool:
-        """Return True if the user's message looks like a web search request."""
+        """Return True if the user's message looks like a web search request.
+
+        Detects:
+        - Explicit search keywords (EN + ID casual/formal)
+        - Multi-word proper nouns that look like titles/names the LLM may not know
+        """
         lower = text.lower()
         all_triggers = self._SEARCH_TRIGGERS_EN + self._SEARCH_TRIGGERS_ID
-        return any(t in lower for t in all_triggers)
+        if any(t in lower for t in all_triggers):
+            return True
+        # Also search if message contains multi-word proper nouns
+        # e.g. "Taskbar Heroes", "Blue Archive", "Solo Leveling"
+        if self._PROPER_NOUN_RE.search(text):
+            return True
+        return False
 
     def _build_search_query(self, text: str) -> str:
         """Strip conversational filler and return a clean search query."""
@@ -221,9 +248,10 @@ class LLMEngine:
             r"^(hey |hei |hai |hi |shiori[,\s]+)",
             r"^(tolong\s+|please\s+|bisa\s+|boleh\s+)",
             r"^(cariin|cari|cek|search|look up|find out)\s+(dong|ya|yah|deh|please)?\s*",
-            r"^(tau ga|tau gak|tau tidak|do you know)\s+",
-            r"^(apa itu|what is|what are|who is|siapa itu)\s+",
-            r"^(tell me about|ceritain|jelasin)\s+",
+            r"^(tau ga|tau gak|tau nggak|tau tidak|do you know|pernah denger)\s+",
+            r"^(kamu tau|lo tau|lu tau|shiori tau)\s+",
+            r"^(apa itu|apa tuh|apaan|what is|what are|who is|siapa itu)\s+",
+            r"^(tell me about|ceritain|jelasin tentang?)\s+",
         ]
         query = text.strip()
         for pattern in fillers:
