@@ -51,23 +51,33 @@ def _get_local_ip() -> str:
         return "localhost"
 
 
-async def _start_avatar_server(port: int) -> None:
-    """Start the FastAPI/uvicorn avatar server as a background asyncio task."""
-    try:
-        import uvicorn
-        from server.app import app
-        config = uvicorn.Config(
-            app,
-            host="0.0.0.0",
-            port=port,
-            log_level="warning",   # suppress uvicorn access logs
-        )
-        server = uvicorn.Server(config)
-        await server.serve()
-    except ImportError:
-        print("[Avatar] uvicorn/fastapi not installed — avatar server disabled.")
-    except Exception as e:
-        print(f"[Avatar] Server error: {e}")
+def _start_avatar_server_thread(port: int) -> None:
+    """Run uvicorn in a daemon thread so it never blocks the asyncio event loop.
+
+    Using a thread (not asyncio task) is essential because _get_text_input()
+    calls input() which is blocking and would starve the event loop otherwise.
+    """
+    import threading
+
+    def _run():
+        try:
+            import uvicorn
+            from server.app import app
+            config = uvicorn.Config(
+                app,
+                host="0.0.0.0",
+                port=port,
+                log_level="warning",
+            )
+            server = uvicorn.Server(config)
+            server.run()   # blocking — runs in its own thread
+        except ImportError:
+            print("[Avatar] uvicorn/fastapi not installed — skipping.")
+        except Exception as e:
+            print(f"[Avatar] Server error: {e}")
+
+    t = threading.Thread(target=_run, daemon=True, name="shiori-avatar")
+    t.start()
 
 
 # ---------------------------------------------------------------------------
@@ -154,13 +164,12 @@ async def run(
     print(f"  SHIORI — AI Companion  |  Mode: {mode.upper()}")
     print("=" * 55 + "\n")
 
-    # -- Avatar server (background task) ----------------------------------
-    avatar_task = None
+    # -- Avatar server (daemon thread — won't block asyncio/input) --------
     if use_avatar:
-        avatar_task = asyncio.create_task(_start_avatar_server(avatar_port))
+        _start_avatar_server_thread(avatar_port)
         local_ip = _get_local_ip()
-        print(f"[Avatar] Server starting on http://{local_ip}:{avatar_port}")
-        print(f"[Avatar] Open on any device: http://{local_ip}:{avatar_port}\n")
+        print(f"[Avatar] http://localhost:{avatar_port}")
+        print(f"[Avatar] http://{local_ip}:{avatar_port}  (LAN)\n")
 
     # -- Subsystem init ---------------------------------------------------
     memory  = MemoryEngine() if use_memory else None
@@ -251,12 +260,6 @@ async def run(
     # -- Shutdown ---------------------------------------------------------
     if speaker:
         speaker.stop()
-    if avatar_task and not avatar_task.done():
-        avatar_task.cancel()
-        try:
-            await avatar_task
-        except (asyncio.CancelledError, Exception):
-            pass   # expected on clean shutdown
     print("\n[SHIORI] Goodbye! またね~\n")
 
 
