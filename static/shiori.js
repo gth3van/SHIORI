@@ -4,8 +4,7 @@ const WS_URL       = `ws://${location.host}/ws`;
 const MODEL_PATH   = "/static/model/ariu/ariu.model3.json";
 const RECONNECT_MS = 3000;
 
-let oml2d    = null;
-let lipTimer = null;
+let oml2d = null;
 
 // ── Loading screen ────────────────────────────────────────────────────────────
 function stepActive(id) {
@@ -86,11 +85,11 @@ function hideLoader() {
       tips:       { style: { display: "none" } },
       models: [{
         path: MODEL_PATH,
-        scale: 0.1,
-        position: [0, 0],
+        scale: 0.22,
+        position: [0, 80],
         stageStyle: {
           background: "transparent",
-          width: window.innerWidth,
+          width: Math.min(window.innerWidth, 500),
           height: window.innerHeight,
         },
       }],
@@ -131,23 +130,55 @@ function connectWS() {
 }
 
 // ── Lip sync ──────────────────────────────────────────────────────────────────
-function startLipFlap(duration_ms) {
-  stopLipFlap();
-  if (!oml2d) return;
-  let open = false;
-  lipTimer = setInterval(() => {
-    open = !open;
-    try {
-      const core = oml2d.model?.internalModel?.coreModel;
-      if (core) core.setParameterValueById("ParamMouthOpenY", open ? 0.8 : 0.1);
-    } catch (_) {}
-  }, 120);
-  if (duration_ms > 0) setTimeout(stopLipFlap, duration_ms);
+let _lipActive   = false;
+let _mouthOpen   = 0;      // 0.0 – 1.0, driven by rAF loop
+let _lipStopAt   = 0;      // performance.now() timestamp when to stop
+let _rafId       = null;
+
+// Possible parameter names used by different Live2D models
+const MOUTH_PARAMS = ["ParamMouthOpenY", "PARAM_MOUTH_OPEN_Y", "ParamMouthOpen"];
+
+function _getCoreModel() {
+  // oh-my-live2d wraps pixi-live2d-display — model path may vary by version
+  return oml2d?.model?.internalModel?.coreModel
+      ?? oml2d?.model?.internalModel?.coreModel
+      ?? null;
 }
+
+function _setMouth(value) {
+  const core = _getCoreModel();
+  if (!core) return;
+  for (const p of MOUTH_PARAMS) {
+    try { core.setParameterValueById(p, value); } catch (_) {}
+  }
+}
+
+function _lipLoop(ts) {
+  if (!_lipActive) {
+    _setMouth(0);
+    _rafId = null;
+    return;
+  }
+  if (_lipStopAt > 0 && ts >= _lipStopAt) {
+    _lipActive = false;
+    _setMouth(0);
+    _rafId = null;
+    return;
+  }
+  // Oscillate mouth open/closed at ~8 Hz
+  _mouthOpen = (Math.sin(ts / 65) > 0) ? 0.8 : 0.05;
+  _setMouth(_mouthOpen);
+  _rafId = requestAnimationFrame(_lipLoop);
+}
+
+function startLipFlap(duration_ms) {
+  _lipActive = true;
+  _lipStopAt = duration_ms > 0 ? performance.now() + duration_ms : 0;
+  if (!_rafId) _rafId = requestAnimationFrame(_lipLoop);
+}
+
 function stopLipFlap() {
-  if (lipTimer) { clearInterval(lipTimer); lipTimer = null; }
-  try {
-    const core = oml2d?.model?.internalModel?.coreModel;
-    if (core) core.setParameterValueById("ParamMouthOpenY", 0);
-  } catch (_) {}
+  _lipActive = false;
+  _lipStopAt = 0;
+  _setMouth(0);
 }
