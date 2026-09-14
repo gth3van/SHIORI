@@ -1,7 +1,7 @@
 # 🌸 SHIORI — AI Waifu Companion
 
-> Locally-run AI companion dengan voice interaction, semantic memory, web search, dan browser avatar.
-> Kuudere. Sarkas. Suka tidur. Kayak kucing.
+> Locally-run AI companion with voice interaction, semantic memory, web search, and a browser-based avatar.
+> Kuudere. Sarcastic. Loves to sleep. Basically a cat.
 
 *Last updated: 2026-09-14*
 
@@ -9,16 +9,16 @@
 
 ## What is SHIORI?
 
-SHIORI adalah AI companion yang jalan 100% lokal di PC kamu — ga ada cloud, ga ada subscription.
-Lo bisa ngobrol via suara atau ketikan, dia jawab dengan suara anime Jepang, ingat siapa kamu, dan bisa searching internet kalau butuh info real-time.
+SHIORI is an AI companion that runs 100% locally on your PC — no cloud, no subscriptions.
+You can talk to her via voice or text, she responds with a Japanese anime voice, remembers who you are, and can search the internet for real-time information when needed.
 
-- **Voice + text mode** — mic atau keyboard (`--mode text`)
-- **Multilingual STT** — Indo, Inggris, Jepang via faster-whisper
-- **Semantic memory** — ingat kamu lintas sesi, dicari by meaning (bukan keyword)
-- **Auto web search** — detect sendiri kapan perlu search (Tavily + SearXNG fallback)
+- **Voice + text mode** — speak via mic or type (`--mode text`)
+- **Multilingual STT** — English, Indonesian, Japanese via faster-whisper
+- **Semantic memory** — remembers you across sessions, queried by meaning (not keywords)
+- **Auto web search** — detects when it needs to search the web (Tavily + SearXNG fallback)
 - **Local LLM** — Ollama + Qwen3:8b, fully private
 - **Anime voice** — Edge-TTS NanamiNeural (Japanese)
-- **Browser avatar** — buka di HP/tablet/layar lain lewat WiFi, ada loading screen
+- **Browser avatar** — open on your phone/tablet/second screen over WiFi, with a loading screen
 
 ---
 
@@ -49,16 +49,16 @@ Mic / Keyboard
 
 ```
 SHIORI/
-├── main.py                  # Asyncio orchestrator — semua sistem di sini
+├── main.py                  # Asyncio orchestrator — core system
 ├── requirements.txt
 ├── ROADMAP.md
-├── .env.example             # Copy ke .env, isi Tavily API key
+├── .env.example             # Copy to .env, add Tavily API key
 │
 ├── brain/
 │   └── llm_engine.py        # LLM + SHIORI persona (kuudere) + search dispatcher
 │
 ├── voice/
-│   ├── stt_listener.py      # Mic + faster-whisper STT
+│   ├── stt_listener.py      # Mic capture + faster-whisper STT
 │   └── tts_speaker.py       # Edge-TTS + pygame playback + volume control
 │
 ├── memory/
@@ -92,7 +92,7 @@ static/
 
 ```bash
 ollama pull qwen3:8b
-# Untuk soal teknis / engineering — lebih akurat tapi lebih lambat:
+# For technical/engineering questions — more accurate but slower:
 ollama pull qwen3:14b
 ```
 
@@ -106,37 +106,37 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Isi TAVILY_API_KEY — free di https://app.tavily.com
+# Add TAVILY_API_KEY — free at https://app.tavily.com
 ```
 
-### 5. Jalanin
+### 5. Run SHIORI
 
 ```bash
 python main.py                 # voice mode (default)
 python main.py --mode text     # text mode
 ```
 
-Buka **`http://localhost:8765`** — loading screen muncul, Ariu keluar.
-Dari HP/tablet di WiFi yang sama: **`http://[IP-PC]:8765`**
+Open **`http://localhost:8765`** — a loading screen will appear, followed by Ariu.
+From a phone/tablet on the same WiFi: **`http://[YOUR-PC-IP]:8765`**
 
 ---
 
 ## CLI Options
 
-| Flag | Default | Keterangan |
-|------|---------|------------|
-| `--mode` | `voice` | `voice` (mic) atau `text` (keyboard) |
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--mode` | `voice` | `voice` (mic) or `text` (keyboard) |
 | `--volume` | `50` | Volume 0–100 |
 | `--model` | `qwen3:8b` | Ollama model tag |
-| `--think` | off | Aktifkan chain-of-thought (lebih lambat, lebih akurat) |
-| `--no-tts` | — | Matikan audio output |
+| `--think` | off | Enable chain-of-thought (slower, more accurate) |
+| `--no-tts` | — | Disable audio output |
 | `--no-avatar` | — | Skip avatar server |
-| `--port` | `8765` | Port avatar server |
+| `--port` | `8765` | Avatar server port |
 | `--no-memory` | — | Disable long-term memory |
 | `--stt-model` | `base` | Whisper model size (`tiny`, `base`, `small`, `medium`) |
-| `--stt-device` | `cpu` | `cpu` atau `cuda` |
+| `--stt-device` | `cpu` | `cpu` or `cuda` |
 
-**Contoh:**
+**Examples:**
 ```bash
 python main.py --mode text --volume 30
 python main.py --mode voice --model qwen3:14b --think   # engineering mode
@@ -147,41 +147,41 @@ python main.py --mode text --no-tts --no-avatar         # pure CLI mode
 
 ## Personality
 
-SHIORI itu **kuudere** — kelihatan dingin dan cuek, tapi sebenernya perhatian (cuma ga mau kelihatan). Sarkas. Suka tidur. Ga suka direcokin tanpa alasan. Kayak kucing.
+SHIORI is a **kuudere** — she seems cold and aloof, but is actually caring (she just doesn't want to show it). Sarcastic. Loves to sleep. Gets annoyed if bothered without a good reason. Just like a cat.
 
-Ngomongnya campur-campur: Indo, Inggris, Jepang — tergantung mood. Dia punya opini sendiri, bisa nolak, bisa roasting kamu, tapi kalau bantu ya bantu beneran.
+She code-switches naturally between Indonesian, English, and Japanese depending on her mood. She has her own opinions, can refuse to do things, might roast you, but if she decides to help, she really helps.
 
 ---
 
 ## Semantic Memory
 
-ChromaDB vector search — dicari by **meaning**, bukan keyword exact.
+Uses ChromaDB vector search — queries by **meaning**, not exact keywords.
 
 ```
-Kamu:   "aku lagi ngerjain project tech"
-Shiori: ingat → "User is developing an AI companion called SHIORI"
-        (matched by meaning, phrasing-nya beda pun ketemu)
+You:    "I'm working on a tech project"
+Shiori: remembers → "User is developing an AI companion called SHIORI"
+        (matched by meaning, even if phrased differently)
 ```
 
-Disimpen lokal di `memory/chroma_db/` + JSON backup. Gitignored.
+Stored locally in `memory/chroma_db/` + JSON backup. Gitignored.
 
 ---
 
 ## Web Search
 
-Auto-detect kapan perlu search. Trigger-nya luas — termasuk slang Indo:
+Auto-detects when a web search is needed. Triggers are broad and include casual slang (EN/ID):
 
 ```
-"shiori tau Taskbar Heroes ga?"  → search otomatis
-"apaan tuh Blue Archive?"        → search otomatis
-"cuaca Jakarta sekarang?"        → search otomatis
+"does shiori know about Taskbar Heroes?"  → auto search
+"what is Blue Archive?"                   → auto search
+"weather in Jakarta right now?"           → auto search
 ```
 
-Kalau mau paksa search: **"cariin / cek / search [topik]"**
+To force a search: **"search / look up [topic]"**
 
-Setup di `.env`:
+Setup in `.env`:
 ```
-TAVILY_API_KEY=tvly-...         # primary (free)
+TAVILY_API_KEY=tvly-...           # primary (free)
 SEARXNG_URL=http://localhost:...  # fallback (optional, self-hosted)
 ```
 
@@ -189,17 +189,17 @@ SEARXNG_URL=http://localhost:...  # fallback (optional, self-hosted)
 
 ## Avatar
 
-Browser-based Live2D avatar via **oh-my-live2d** (Cubism Core bundled, no extra install).
-Jalan di thread sendiri — ga ganggu voice loop.
+Browser-based Live2D avatar via **oh-my-live2d** (Cubism Core bundled, no extra installation).
+Runs in its own daemon thread — doesn't block the voice loop.
 
 ```bash
 python main.py
 # → http://localhost:8765  (PC)
-# → http://[IP]:8765       (HP/tablet/layar lain)
+# → http://[IP]:8765       (Phone/tablet/second screen)
 ```
 
-Loading screen nunjukin progress: library → model → WebSocket → ready.
-Mulut Ariu gerak waktu Shiori ngomong (lip sync via requestAnimationFrame).
+A loading screen shows the boot progress: library → model → WebSocket → ready.
+Ariu's mouth moves when Shiori speaks (frame-accurate lip sync via requestAnimationFrame).
 
 ---
 
@@ -237,11 +237,11 @@ Mulut Ariu gerak waktu Shiori ngomong (lip sync via requestAnimationFrame).
 
 ## Notes
 
-- 100% lokal — no OpenAI, no cloud LLM, no subscription
-- Web search adalah satu-satunya optional cloud (Tavily free: 1000 req/bulan)
-- Japanese voice by design — biar konsisten sama persona karakter
-- `--think` OFF default buat real-time feel, ON buat soal teknis
-- Semua data personal (memory, API keys) gitignored
+- 100% local — no OpenAI, no cloud LLMs, no subscriptions.
+- Web search is the only optional cloud service (Tavily free tier: 1000 req/month).
+- Japanese voice is used for all languages by design (consistent with the anime persona).
+- `--think` is OFF by default for real-time conversation speed, turn it ON for technical questions.
+- All personal data (memory, API keys) is gitignored.
 
 ---
 
