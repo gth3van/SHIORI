@@ -1,7 +1,7 @@
 # 🌸 SHIORI — AI Waifu Companion
 
-> Locally-run AI companion with voice interaction, semantic memory, web search, and a browser-based avatar.
-> Kuudere. Sarcastic. Loves to sleep. Basically a cat.
+> Locally-run AI companion dengan voice interaction, semantic memory, web search, dan browser avatar.
+> Kuudere. Sarkas. Suka tidur. Kayak kucing.
 
 *Last updated: 2026-09-14*
 
