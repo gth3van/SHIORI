@@ -6,15 +6,24 @@
   <title>SHIORI</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100vw; height: 100vh; overflow: hidden; background: #0a0a0f; }
+    html, body {
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+      background: #0a0a0f !important;
+    }
 
-    /* ── Loading overlay ─────────────────────────────────────── */
+    /* Force oh-my-live2d's injected containers to be transparent */
+    #oml2d-stage, #oml2d-canvas, canvas, .oml2d-stage {
+      background: transparent !important;
+    }
+
+    /* ── Loading overlay ───────────────────────────────── */
     #loader {
       position: fixed; inset: 0;
       background: #0a0a0f;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      z-index: 9999;
+      z-index: 99999;
       transition: opacity 0.8s ease;
     }
     #loader.fade-out { opacity: 0; pointer-events: none; }
@@ -24,7 +33,6 @@
       color: #c9a0dc; font-size: 2rem; letter-spacing: 6px;
       margin-bottom: 32px; text-transform: uppercase;
     }
-
     #loader h1 span { color: #fff; }
 
     .step-list {
@@ -32,14 +40,14 @@
       font-family: monospace; font-size: 13px;
     }
     .step-list li {
-      padding: 6px 0;
-      color: #555;
+      padding: 7px 0;
+      color: #444;
       display: flex; align-items: center; gap: 10px;
       border-bottom: 1px solid #1a1a2e;
       transition: color 0.3s;
     }
-    .step-list li.ok   { color: #7fff7f; }
-    .step-list li.fail { color: #ff6b6b; }
+    .step-list li.ok     { color: #7fff7f; }
+    .step-list li.fail   { color: #ff6b6b; }
     .step-list li.active { color: #ffe066; }
 
     .dot {
@@ -49,29 +57,22 @@
     }
     li.ok   .dot { background: #7fff7f; }
     li.fail .dot { background: #ff6b6b; }
-    li.active .dot {
-      background: #ffe066;
-      animation: pulse 0.8s infinite alternate;
-    }
+    li.active .dot { background: #ffe066; animation: pulse 0.8s infinite alternate; }
+
     @keyframes pulse { from { opacity: 1; } to { opacity: 0.2; } }
 
     #loader-error {
-      margin-top: 20px; color: #ff6b6b;
+      margin-top: 18px; color: #ff6b6b;
       font-family: monospace; font-size: 12px;
-      max-width: 360px; text-align: center;
-      display: none;
+      max-width: 340px; text-align: center; display: none;
     }
-
-    /* ── Main canvas area ─────────────────────────────────────── */
-    #avatar-root { width: 100vw; height: 100vh; }
   </style>
 </head>
 <body>
 
-<!-- Loading overlay -->
 <div id="loader">
   <h1>SHI<span>ORI</span></h1>
-  <ul class="step-list" id="steps">
+  <ul class="step-list">
     <li id="s-lib">   <span class="dot"></span> Loading library...</li>
     <li id="s-model"> <span class="dot"></span> Loading model...</li>
     <li id="s-ws">    <span class="dot"></span> Connecting WebSocket...</li>
@@ -79,9 +80,6 @@
   </ul>
   <div id="loader-error"></div>
 </div>
-
-<!-- Avatar container -->
-<div id="avatar-root"></div>
 
 <script src="/static/oh-my-live2d.min.js"></script>
 <script src="/static/shiori.js"></script>

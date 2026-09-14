@@ -1,7 +1,3 @@
-/**
- * shiori.js
- * Live2D renderer + loading screen + WebSocket client.
- */
 "use strict";
 
 const WS_URL       = `ws://${location.host}/ws`;
@@ -11,45 +7,45 @@ const RECONNECT_MS = 3000;
 let oml2d    = null;
 let lipTimer = null;
 
-// ── Loading screen helpers ────────────────────────────────────────────────────
+// ── Loading screen ────────────────────────────────────────────────────────────
 function stepActive(id) {
   const el = document.getElementById(id);
-  if (el) { el.className = "active"; el.querySelector(".dot").style.animation = ""; }
+  if (el) el.className = "active";
 }
 function stepOk(id, label) {
   const el = document.getElementById(id);
   if (!el) return;
   el.className = "ok";
-  if (label) el.childNodes[1].textContent = " " + label;
+  if (label) el.lastChild.textContent = " " + label;
 }
 function stepFail(id, label) {
   const el = document.getElementById(id);
   if (!el) return;
   el.className = "fail";
-  if (label) el.childNodes[1].textContent = " " + label;
+  if (label) el.lastChild.textContent = " " + label;
   const errEl = document.getElementById("loader-error");
-  if (errEl && label) { errEl.style.display = "block"; errEl.textContent = label; }
+  if (errEl) { errEl.style.display = "block"; errEl.textContent = label; }
 }
 function hideLoader() {
-  const loader = document.getElementById("loader");
-  if (loader) {
-    loader.classList.add("fade-out");
-    setTimeout(() => loader.remove(), 900);
-  }
+  const l = document.getElementById("loader");
+  if (!l) return;
+  l.classList.add("fade-out");
+  setTimeout(() => { if (l.parentNode) l.parentNode.removeChild(l); }, 900);
 }
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
+// ── Boot sequence ─────────────────────────────────────────────────────────────
 (async function boot() {
 
   // Step 1 — Library
   stepActive("s-lib");
+  await new Promise(r => setTimeout(r, 100));  // let browser paint first
   if (typeof OML2D === "undefined" || typeof OML2D.loadOml2d !== "function") {
-    stepFail("s-lib", "Library failed to load!");
+    stepFail("s-lib", "Library failed to load");
     return;
   }
   stepOk("s-lib", "Library OK");
 
-  // Step 2 — Model file
+  // Step 2 — Model file reachable?
   stepActive("s-model");
   try {
     const res = await fetch(MODEL_PATH);
@@ -62,32 +58,29 @@ function hideLoader() {
 
   // Step 3 — WebSocket
   stepActive("s-ws");
-  await new Promise((resolve) => {
-    const ws = new WebSocket(WS_URL);
-    const timer = setTimeout(() => {
-      stepFail("s-ws", "WebSocket timeout — is Python running?");
-      resolve();
-    }, 3000);
-    ws.onopen = () => {
-      clearTimeout(timer);
-      stepOk("s-ws", "WebSocket connected");
-      ws.close();
-      resolve();
-    };
-    ws.onerror = () => {
-      clearTimeout(timer);
-      stepFail("s-ws", "WebSocket failed — Python not running");
-      resolve();
-    };
+  const wsOk = await new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), 3000);
+    try {
+      const ws = new WebSocket(WS_URL);
+      ws.onopen  = () => { clearTimeout(timer); ws.close(); resolve(true); };
+      ws.onerror = () => { clearTimeout(timer); resolve(false); };
+    } catch { resolve(false); }
   });
+  if (wsOk) {
+    stepOk("s-ws", "WebSocket OK");
+  } else {
+    stepFail("s-ws", "WebSocket failed (Python not running?)");
+    // Don't hard-stop — model can still show without WS
+  }
 
-  // Step 4 — Load model
+  // Step 4 — Render model
   stepActive("s-ready");
   try {
     oml2d = await OML2D.loadOml2d({
       mobileDisplay: true,
       dockedPosition: "left",
       primaryColor: "rgba(0,0,0,0)",
+      backgroundColor: "transparent",
       statusBar:  { display: false },
       menus:      { disable: true },
       tips:       { style: { display: "none" } },
@@ -95,24 +88,34 @@ function hideLoader() {
         path: MODEL_PATH,
         scale: 0.1,
         position: [0, 0],
-        stageStyle: { width: window.innerWidth, height: window.innerHeight },
+        stageStyle: {
+          background: "transparent",
+          width: window.innerWidth,
+          height: window.innerHeight,
+        },
       }],
     });
+
+    // Force transparent on any injected canvas/stage elements
+    document.querySelectorAll("canvas, #oml2d-stage, .oml2d-stage").forEach(el => {
+      el.style.background = "transparent";
+    });
+
     stepOk("s-ready", "Ariu is ready ✨");
-    setTimeout(hideLoader, 800);   // brief pause so user sees "ready"
+    setTimeout(hideLoader, 800);
   } catch (e) {
     stepFail("s-ready", "Model render failed: " + e.message);
     return;
   }
 
-  // Persistent WebSocket for events
+  // Persistent WS for events
   connectWS();
-
 })();
 
-// ── WebSocket (persistent, auto-reconnect) ────────────────────────────────────
+// ── Persistent WebSocket ──────────────────────────────────────────────────────
 function connectWS() {
-  const ws = new WebSocket(WS_URL);
+  let ws;
+  try { ws = new WebSocket(WS_URL); } catch { setTimeout(connectWS, RECONNECT_MS); return; }
   ws.onclose = () => setTimeout(connectWS, RECONNECT_MS);
   ws.onerror = () => ws.close();
   ws.onmessage = (evt) => {
@@ -141,7 +144,6 @@ function startLipFlap(duration_ms) {
   }, 120);
   if (duration_ms > 0) setTimeout(stopLipFlap, duration_ms);
 }
-
 function stopLipFlap() {
   if (lipTimer) { clearInterval(lipTimer); lipTimer = null; }
   try {
