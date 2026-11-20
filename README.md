@@ -9,7 +9,7 @@
 
 ## What is SHIORI?
 
-SHIORI is an AI companion that runs 100% locally on your PC — no cloud, no subscriptions.
+SHIORI is an AI companion with local speech recognition, conversation through Ollama, and memory.
 You can talk to her via voice or text, she responds with a Japanese anime voice, remembers who you are, and can search the internet for real-time information when needed.
 
 - **Voice + text mode** — speak via mic or type (`--mode text`)
@@ -153,6 +153,23 @@ She code-switches naturally between Indonesian, English, and Japanese depending 
 
 ---
 
+## Ask Codex
+
+With the Codex CLI on your PATH, run `codex login` if you haven't signed in.
+On Windows, SHIORI looks for the native `codex.exe`.
+In voice or text mode, start a request with **"Shiori, ask Codex"** or **"ask Codex"**.
+
+```
+Shiori, ask Codex why the avatar isn't loading.
+```
+
+Each request starts a separate read-only Codex session in this repository.
+Codex connects to OpenAI and can inspect source files to answer the request.
+SHIORI passes the task text without her conversation history or saved memories.
+The reply appears in the terminal and is spoken when TTS is enabled.
+
+---
+
 ## Semantic Memory
 
 Uses ChromaDB vector search — queries by **meaning**, not exact keywords.
@@ -237,8 +254,8 @@ Ariu's mouth moves when Shiori speaks (frame-accurate lip sync via requestAnimat
 
 ## Notes
 
-- 100% local — no OpenAI, no cloud LLMs, no subscriptions.
-- Web search is the only optional cloud service (Tavily free tier: 1000 req/month).
+- Ollama handles ordinary conversation locally. Explicit Codex requests use OpenAI.
+- Edge-TTS uses an online voice service, and optional Tavily web search uses an online service.
 - Japanese voice is used for all languages by design (consistent with the anime persona).
 - `--think` is OFF by default for real-time conversation speed, turn it ON for technical questions.
 - All personal data (memory, API keys) is gitignored.

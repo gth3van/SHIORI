@@ -75,7 +75,7 @@ function hideLoader() {
   // Step 4 — Render model
   stepActive("s-ready");
   try {
-    oml2d = await OML2D.loadOml2d({
+    oml2d = OML2D.loadOml2d({
       mobileDisplay: true,
       dockedPosition: "left",
       primaryColor: "rgba(0,0,0,0)",
@@ -93,6 +93,12 @@ function hideLoader() {
           height: window.innerHeight,
         },
       }],
+    });
+    await new Promise((resolve, reject) => {
+      oml2d.onLoad((status) => {
+        if (status === "success") resolve();
+        if (status === "fail") reject(new Error("Live2D model or asset failed to load"));
+      });
     });
 
     // Force transparent on any injected canvas/stage elements
@@ -120,11 +126,12 @@ function connectWS() {
   ws.onmessage = (evt) => {
     let ev;
     try { ev = JSON.parse(evt.data); } catch { return; }
+    const model = oml2d?.models.model;
     switch (ev.type) {
-      case "speaking": startLipFlap(ev.duration_ms || 0); oml2d?.model?.motion("Talk"); break;
-      case "idle":     stopLipFlap(); oml2d?.model?.motion("Idle"); break;
-      case "emotion":  oml2d?.model?.expression(ev.name); break;
-      case "motion":   oml2d?.model?.motion(ev.name); break;
+      case "speaking": startLipFlap(ev.duration_ms || 0); model?.motion("Talk"); break;
+      case "idle":     stopLipFlap(); model?.motion("Idle"); break;
+      case "emotion":  model?.expression(ev.name); break;
+      case "motion":   model?.motion(ev.name); break;
     }
   };
 }
@@ -138,15 +145,8 @@ let _rafId       = null;
 // Possible parameter names used by different Live2D models
 const MOUTH_PARAMS = ["ParamMouthOpenY", "PARAM_MOUTH_OPEN_Y", "ParamMouthOpen"];
 
-function _getCoreModel() {
-  // oh-my-live2d wraps pixi-live2d-display — model path may vary by version
-  return oml2d?.model?.internalModel?.coreModel
-      ?? oml2d?.model?.internalModel?.coreModel
-      ?? null;
-}
-
 function _setMouth(value) {
-  const core = _getCoreModel();
+  const core = oml2d?.models.model?.internalModel?.coreModel;
   if (!core) return;
   for (const p of MOUTH_PARAMS) {
     try { core.setParameterValueById(p, value); } catch (_) {}

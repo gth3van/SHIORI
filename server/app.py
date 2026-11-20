@@ -11,7 +11,10 @@ Run standalone (for testing):
 """
 from __future__ import annotations
 
+import asyncio
 import socket
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -20,7 +23,17 @@ from fastapi.staticfiles import StaticFiles
 
 from server import ws_bridge
 
-app = FastAPI(title="SHIORI Avatar Server")
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    ws_bridge.set_server_loop(asyncio.get_running_loop())
+    try:
+        yield
+    finally:
+        ws_bridge.set_server_loop(None)
+
+
+app = FastAPI(title="SHIORI Avatar Server", lifespan=_lifespan)
 
 _STATIC_DIR = Path(__file__).parent.parent / "static"
 

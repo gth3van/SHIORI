@@ -63,14 +63,18 @@ if (typeof OML2D !== "undefined") {
   var fn = OML2D.loadOml2d || OML2D.default;
   if (typeof fn === "function") {
     log("Calling loadOml2d...", "wait");
-    fn({
-      mobileDisplay: true,
-      models: [{ path: "/static/model/ariu/ariu.model3.json", scale: 0.1 }]
-    }).then(function(inst) {
-      log("Model loaded OK! Type: " + typeof inst, "ok");
-    }).catch(function(e) {
+    try {
+      const viewer = fn({
+        mobileDisplay: true,
+        models: [{ path: "/static/model/ariu/ariu.model3.json", scale: 0.1 }]
+      });
+      viewer.onLoad(function(status) {
+        if (status === "success") log("Model loaded OK", "ok");
+        if (status === "fail") log("Model or asset failed to load", "fail");
+      });
+    } catch (e) {
       log("Model FAILED: " + e, "fail");
-    });
+    }
   } else {
     log("loadOml2d is not a function. OML2D keys: " + JSON.stringify(Object.keys(OML2D)), "fail");
   }

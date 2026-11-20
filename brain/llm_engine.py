@@ -192,68 +192,40 @@ class LLMEngine:
 
     # ------------------------------------------------------------------
     # Tool dispatcher helpers
-        # Keywords that signal the user wants real-world / current information
-    _SEARCH_TRIGGERS_EN: list[str] = [
-        "search", "look up", "find out", "what is", "what are", "who is",
-        "where is", "when is", "how much", "how many", "latest", "recent",
-        "news", "weather", "price", "score", "today", "current", "right now",
-        "tell me about", "do you know", "what happened", "have you heard",
-        "heard of", "know about", "ever heard",
-    ]
-    _SEARCH_TRIGGERS_ID: list[str] = [
-        # explicit search
-        "cari", "cariin", "cek", "cari tau", "googling", "search",
-        # "apa" questions
-        "apa itu", "apaan", "apa tuh", "apa sih", "apa ya",
-        # "siapa" questions
-        "siapa itu", "siapa sih", "siapa tuh",
-        # "tau" — paling sering kelewat
-        "tau ga", "tau gak", "tau nggak", "tau tidak", "tau soal",
-        "kamu tau", "lo tau", "lu tau", "shiori tau",
-        "pernah denger", "pernah tau", "pernah dengar",
-        # info / berita
-        "berita", "info", "informasi", "update", "terbaru", "terkini",
-        "sekarang", "hari ini", "cuaca", "harga", "berapa",
-        # game / tech / entertainment
-        "game", "aplikasi", "app", "software", "film", "anime", "manga",
-        "lagu", "artis", "band",
-        # misc
-        "tolong cari", "tolong cek", "gimana kabar", "jelasin tentang",
-    ]
-
-    # Regex to catch proper nouns — e.g. "Taskbar Heroes", "Blue Archive"
-    _PROPER_NOUN_RE = re.compile(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b')
+    _SEARCH_FILLER = re.compile(
+        r"^(?:(?:hey|hei|hai|hi|shiori|please|tolong|bisa|boleh|"
+        r"(?:can|could|would) you)[,\s]+)+",
+        re.IGNORECASE,
+    )
+    _SEARCH_REQUEST = re.compile(
+        r"^(?:search(?: for)?|look up|find out|cari(?:in| tau)?|cek|googling|"
+        r"what (?:is|are|happened)|(?:what|who|where|when)['’]s|"
+        r"(?:who|where|when) is|how (?:much|many)|"
+        r"tell me about|(?:do you|does shiori) know|have you heard|ever heard|"
+        r"weather|(?:latest|recent|current) (?:news|updates?|price|score)|"
+        r"news (?:about|on)|(?:price|score) (?:of|for)|"
+        r"apa (?:itu|tuh|sih|ya)|apaan|siapa (?:itu|sih|tuh)|"
+        r"tau (?:ga|gak|nggak|tidak|soal)|(?:kamu|lo|lu) tau|"
+        r"pernah (?:denger|dengar|tau)|jelasin tentang|"
+        r"cuaca|harga|berapa|berita (?:terbaru|terkini|tentang))\b",
+        re.IGNORECASE,
+    )
 
     def _detect_search_intent(self, text: str) -> bool:
-        """Return True if the user's message looks like a web search request.
-
-        Detects:
-        - Explicit search keywords (EN + ID casual/formal)
-        - Multi-word proper nouns that look like titles/names the LLM may not know
-        """
-        lower = text.lower()
-        all_triggers = self._SEARCH_TRIGGERS_EN + self._SEARCH_TRIGGERS_ID
-        if any(t in lower for t in all_triggers):
-            return True
-        # Also search if message contains multi-word proper nouns
-        # e.g. "Taskbar Heroes", "Blue Archive", "Solo Leveling"
-        if self._PROPER_NOUN_RE.search(text):
-            return True
-        return False
+        """Require a search command, question, or current-information request."""
+        request = self._SEARCH_FILLER.sub("", text.strip())
+        return self._SEARCH_REQUEST.match(request) is not None
 
     def _build_search_query(self, text: str) -> str:
         """Strip conversational filler and return a clean search query."""
-        # Remove common Indonesian/English filler prefixes
         fillers = [
-            r"^(hey |hei |hai |hi |shiori[,\s]+)",
-            r"^(tolong\s+|please\s+|bisa\s+|boleh\s+)",
-            r"^(cariin|cari|cek|search|look up|find out)\s+(dong|ya|yah|deh|please)?\s*",
-            r"^(tau ga|tau gak|tau nggak|tau tidak|do you know|pernah denger)\s+",
-            r"^(kamu tau|lo tau|lu tau|shiori tau)\s+",
-            r"^(apa itu|apa tuh|apaan|what is|what are|who is|siapa itu)\s+",
-            r"^(tell me about|ceritain|jelasin tentang?)\s+",
+            r"^(?:cariin|cari tau|cari|cek|search for|search|look up|find out)\s+(?:(?:dong|ya|yah|deh|please)\s+)?",
+            r"^(?:(?:do you|does shiori) know(?: about)?|have you heard(?: of| about)?|ever heard(?: of| about)?)\s+",
+            r"^(?:(?:(?:kamu|lo|lu)\s+)?tau(?: ga| gak| nggak| tidak| soal)?|pernah (?:denger|dengar|tau))\s+",
+            r"^(?:apa itu|apa tuh|apaan|what is|what are|who is|siapa itu)\s+",
+            r"^(?:tell me about|jelasin tentang)\s+",
         ]
-        query = text.strip()
+        query = self._SEARCH_FILLER.sub("", text.strip())
         for pattern in fillers:
             query = re.sub(pattern, "", query, flags=re.IGNORECASE).strip()
         return query or text.strip()

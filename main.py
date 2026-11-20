@@ -5,11 +5,11 @@ SHIORI — Central asyncio orchestrator.
 
 Pipeline (one loop iteration):
   1. Input — voice (STT mic) or text (keyboard) depending on --mode
-  2. MemoryEngine injects relevant facts into the LLM context
-  3. LLMEngine generates SHIORI reply (web search auto-triggered if needed)
-  4. MemoryEngine auto-extracts and saves any new facts from the exchange
+  2. Explicit "ask Codex" requests go to the read-only Codex CLI
+  3. Other messages use MemoryEngine and LLMEngine, with web search as needed
+  4. MemoryEngine saves facts from ordinary conversation
   5. TTSSpeaker synthesises and plays the reply (skip with --no-tts)
-  6. Avatar server broadcasts events to browser (Pixi.js Live2D)
+  6. Avatar server broadcasts events to browser (oh-my-live2d)
 
 Run:
     python main.py                           # voice mode + avatar server
@@ -35,6 +35,7 @@ from pathlib import Path
 
 from brain.llm_engine import LLMEngine, SHIORI_SYSTEM_PROMPT
 from memory.memory_engine import MemoryEngine
+from tools.codex_agent import ask_codex, get_codex_task
 from voice.tts_speaker import TTSSpeaker
 
 
@@ -131,15 +132,12 @@ def _get_voice_input(stt) -> str:
     return stt.listen_and_transcribe()
 
 
-def _get_text_input() -> str:
-    """Read one line of keyboard input from the user."""
-    try:
-        sys.stdout.write("You: ")
-        sys.stdout.flush()
-        line = sys.stdin.readline()
-        return line.strip()
-    except (EOFError, KeyboardInterrupt):
-        return ""
+def _get_text_input() -> str | None:
+    """Read one line, returning None when stdin is closed."""
+    sys.stdout.write("You: ")
+    sys.stdout.flush()
+    line = sys.stdin.readline()
+    return line.strip() if line else None
 
 
 # ---------------------------------------------------------------------------
@@ -212,6 +210,8 @@ async def run(
             else:
                 transcript = _get_text_input()
 
+            if transcript is None:
+                break
             if not transcript:
                 continue
 
@@ -222,16 +222,19 @@ async def run(
             if mode == "voice":
                 print(f"\n[You] {transcript}")
 
-            # 2. Inject memory
-            if memory:
-                engine.system_prompt = _build_system_prompt_with_memory(
-                    memory, transcript
-                )
-
-            # 3. Get reply from LLM
-            reply = ""
-            async for chunk in engine.stream_reply(transcript):
-                reply = chunk
+            codex_task = get_codex_task(transcript)
+            if codex_task is not None:
+                if codex_task:
+                    print("[Codex] Working on it...", flush=True)
+                    reply = await ask_codex(codex_task)
+                else:
+                    reply = "What should I ask Codex?"
+            else:
+                if memory is not None:
+                    engine.system_prompt = _build_system_prompt_with_memory(
+                        memory, transcript
+                    )
+                reply = await engine.chat(transcript)
 
             if not reply:
                 continue
@@ -239,7 +242,7 @@ async def run(
             print(f"[SHIORI] {reply}\n")
 
             # 4. Save new facts
-            if memory:
+            if memory is not None and codex_task is None:
                 for fact in _extract_facts(transcript, reply):
                     memory.remember(fact, source="conversation")
 

@@ -7,8 +7,8 @@ Backend:
   PRIMARY  -> VectorMemoryStore (ChromaDB) -- semantic search by MEANING
   FALLBACK -> JSON keyword vault            -- if chromadb not installed
 
-On first run, existing shiori_memory.json entries are auto-migrated into
-ChromaDB. JSON file is kept as a human-readable backup on every write.
+On startup, facts saved in shiori_memory.json are imported if ChromaDB is
+available. The JSON file is kept as a human-readable backup on every write.
 
 Public API (same as Phase 2, no breaking changes):
   remember(fact)             Save a new fact
@@ -29,7 +29,10 @@ import re
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from memory.vector_store import VectorMemoryStore
 
 
 _DEFAULT_VAULT = Path(__file__).parent / "shiori_memory.json"
@@ -49,16 +52,17 @@ class MemoryEngine:
     ) -> None:
         self.vault_path = Path(vault_path)
         self.max_inject = max_inject
-        self._vector: Optional[object] = None
+        self._vector: VectorMemoryStore | None = None
         self._memories: list[dict] = []   # used by fallback path only
 
         # Try ChromaDB vector backend
         try:
             from memory.vector_store import VectorMemoryStore
+
             self._vector = VectorMemoryStore(max_results=max_inject)
 
-            # One-time migration from JSON vault
-            if self.vault_path.exists() and len(self._vector) == 0:
+            # Recover facts saved while ChromaDB was unavailable.
+            if self.vault_path.exists():
                 migrated = self._vector.import_from_json(self.vault_path)
                 if migrated:
                     print(f"[MemoryEngine] Migrated {migrated} memories JSON -> ChromaDB.")
@@ -91,7 +95,8 @@ class MemoryEngine:
             json.dump(self._memories, f, ensure_ascii=False, indent=2)
 
     def _sync_json_backup(self) -> None:
-        if self._vector and hasattr(self._vector, "export_to_json"):
+        if self._vector is not None:
+            self.vault_path.parent.mkdir(parents=True, exist_ok=True)
             self._vector.export_to_json(self.vault_path)
 
     # ------------------------------------------------------------------
@@ -100,7 +105,7 @@ class MemoryEngine:
 
     def remember(self, fact: str, source: str = "conversation") -> str:
         """Save a new fact. Returns its unique ID."""
-        if self._vector:
+        if self._vector is not None:
             mem_id = self._vector.remember(fact, source=source)
             self._sync_json_backup()
             return mem_id
@@ -125,7 +130,7 @@ class MemoryEngine:
 
     def recall(self, query: str, top_n: int = 5) -> list[dict]:
         """Search memories by meaning (vector) or keyword (fallback)."""
-        if self._vector:
+        if self._vector is not None:
             return self._vector.recall(query, top_n=top_n)
         # JSON keyword fallback
         if not query.strip() or not self._memories:
@@ -141,7 +146,7 @@ class MemoryEngine:
 
     def inject_into_prompt(self, query: str) -> str:
         """Return formatted memory context string for the LLM."""
-        if self._vector:
+        if self._vector is not None:
             return self._vector.inject_into_prompt(query)
         hits = self.recall(query, top_n=self.max_inject)
         if not hits:
@@ -153,7 +158,7 @@ class MemoryEngine:
 
     def forget(self, fact_id: str) -> bool:
         """Delete a memory by ID. Returns True if deleted."""
-        if self._vector:
+        if self._vector is not None:
             result = self._vector.forget(fact_id)
             self._sync_json_backup()
             return result
@@ -168,7 +173,7 @@ class MemoryEngine:
 
     def clear_all(self) -> None:
         """Wipe the entire memory vault."""
-        if self._vector:
+        if self._vector is not None:
             self._vector.clear_all()
             self._sync_json_backup()
             return
@@ -178,7 +183,7 @@ class MemoryEngine:
 
     def show_all(self) -> None:
         """Print all memories to console (debugging)."""
-        if self._vector:
+        if self._vector is not None:
             self._vector.show_all()
             return
         if not self._memories:
@@ -190,7 +195,7 @@ class MemoryEngine:
         print()
 
     def __len__(self) -> int:
-        if self._vector:
+        if self._vector is not None:
             return len(self._vector)
         return len(self._memories)
 

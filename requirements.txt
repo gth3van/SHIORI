@@ -18,6 +18,9 @@ tavily-python
 python-dotenv
 httpx
 
+# Phase 4 — Semantic memory
+chromadb
+
 # Phase 5 -- Avatar server
 fastapi
 uvicorn[standard]

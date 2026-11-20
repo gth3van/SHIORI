@@ -69,6 +69,7 @@ class VectorMemoryStore:
 
         self.db_dir = Path(db_dir)
         self.max_results = max_results
+        self._collection_name = collection_name
         self.db_dir.mkdir(parents=True, exist_ok=True)
 
         self._client = chromadb.PersistentClient(
@@ -186,9 +187,9 @@ class VectorMemoryStore:
 
     def clear_all(self) -> None:
         """Wipe all memories from the vector store."""
-        self._client.delete_collection(_DEFAULT_COLLECTION)
+        self._client.delete_collection(self._collection_name)
         self._col = self._client.get_or_create_collection(
-            name=_DEFAULT_COLLECTION,
+            name=self._collection_name,
             metadata={"hnsw:space": "cosine"},
         )
         print("[VectorStore] All memories cleared.")
@@ -214,21 +215,22 @@ class VectorMemoryStore:
         print(f"[VectorStore] Exported {len(entries)} memories -> {path}.")
 
     def import_from_json(self, path: Path | str) -> int:
-        """Import memories from a JSON file (migrates from Phase 2 JSON vault)."""
+        """Import missing facts from a JSON vault without replacing existing memories."""
         path = Path(path)
         if not path.exists():
             return 0
 
         entries = json.loads(path.read_text(encoding="utf-8"))
-        imported = 0
+        documents = self._col.get(include=["documents"])["documents"] or []
+        known = {fact.casefold() for fact in documents if fact}
+        before = self._col.count()
         for e in entries:
             fact = e.get("fact", "").strip()
-            if fact:
+            if fact and fact.casefold() not in known:
                 self.remember(fact, source=e.get("source", "import"))
-                imported += 1
+                known.add(fact.casefold())
 
-        print(f"[VectorStore] Imported {imported} memories from {path}.")
-        return imported
+        return self._col.count() - before
 
     def show_all(self) -> None:
         """Print all memories to console (debugging)."""
